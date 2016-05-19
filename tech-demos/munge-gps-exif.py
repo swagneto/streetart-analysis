@@ -196,7 +196,7 @@ debug_flag = False
 
 # parse our command line options.
 try:
-    opts, args = getopt.getopt( sys.argv[1:], "F:hn:" )
+    opts, args = getopt.getopt( sys.argv[1:], "d" )
 except getopt.GetoptError as error:
     print( "Error processing option: {0:s}.".format( str( error ) ), file=sys.stderr )
     sys.exit( 1 )
