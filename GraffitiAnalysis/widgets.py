@@ -1,4 +1,4 @@
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QRectF
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import ( QHBoxLayout, QLabel, QRubberBand, QSizeGrip,
                               QSizePolicy, QVBoxLayout, QWidget )
@@ -216,14 +216,34 @@ class RubberBandedResizingPixmap( ResizingPixmap ):
         self.banded_region.move( event.x(), event.y() )
         self.banded_region.resize( 10, 10 )
 
-    def get_banded_region( self ):
+    def get_region_geometry( self, normalized_flag=False ):
         """
-        Takes no arguments.
+        Returns the banded region's geometry.  The geometry may be normalized
+        relative to the associated pixmap's size so that it may be used with
+        scaled versions of the pixmap.
+
+        Takes 1 argument:
+
+          normalized_flag - Optional flag indicating a normalized geometry
+                            is desired.  If omitted, defaults to False.
 
         Returns 1 value:
 
-          banded_region - Widget representing the rubberbanded region for
-                          the parent.
-        """
+          geometry - A QRectF object containing the geometry.
 
-        return self.banded_region
+        """
+        region_geometry = self.banded_region.geometry()
+
+        if not normalized_flag:
+            return QRectF( region_geometry )
+
+        pixmap_size = self.pixmap().size()
+
+        normalized_position = (region_geometry.x() / pixmap_size.width(),
+                               region_geometry.y() / pixmap_size.height())
+
+        normalized_size = (region_geometry.width() / pixmap_size.width(),
+                           region_geometry.height() / pixmap_size.height())
+
+        return QRectF( *normalized_position,
+                       *normalized_size )
