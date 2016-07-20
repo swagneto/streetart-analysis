@@ -213,8 +213,10 @@ class RubberBandedResizingPixmap( ResizingPixmap ):
         Returns nothing.
         """
 
+        # move to the click and reset the region to the smallest possible
+        # size.
         self.banded_region.move( event.x(), event.y() )
-        self.banded_region.resize( 10, 10 )
+        self.banded_region.resize( 1, 1 )
 
     def get_region_geometry( self, normalized_flag=False ):
         """
