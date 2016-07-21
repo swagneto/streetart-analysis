@@ -502,14 +502,12 @@ class PhotoRecordViewer( RecordWindow ):
         Returns nothing.
         """
 
-        # select the first entry.
+        # select the first entry so we can use the keyboard for navigation.
         #
-        # NOTE: we have to do this after all widgets are created, otherwise
-        #       we are likely to crash.
+        # NOTE: since the first column of our view is hidden, we need to
+        #       select the first visible column instead.
         #
-        # XXX: if this is commented out
-        #selection_view.setCurrentIndex( proxy_model.index( 0, 0 ) )
-        #self.selectionView.setFocus( True )
+        self.selectionView.setCurrentIndex( self.proxyPhotosModel.index( 0, 1 ) )
 
     def get_photo_id_from_selection( self ):
         """
@@ -908,6 +906,9 @@ class PhotoRecordEditor( RecordEditor ):
 
         Returns nothing.
         """
+
+        # select the first entry so we can use the keyboard for navigation.
+        self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, 0 ) )
 
     def commit_record( self ):
         """
