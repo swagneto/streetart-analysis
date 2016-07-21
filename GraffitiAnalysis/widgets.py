@@ -1,7 +1,7 @@
 from PyQt5.QtCore import Qt, QSize, QRectF
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import ( QHBoxLayout, QLabel, QRubberBand, QSizeGrip,
-                              QSizePolicy, QVBoxLayout, QWidget )
+                              QWidget )
 
 class ResizingPixmap( QLabel ):
     """
