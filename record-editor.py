@@ -58,6 +58,149 @@ from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
 import GraffitiAnalysis.database as grafdb
 import GraffitiAnalysis.widgets as grafwidgets
 
+class RecordEditor( QMainWindow ):
+    """
+    """
+
+    def __init__( self, record, preview_pixmap, window_size=None, close_callback=None, commit_callback=None ):
+        """
+        Constructs a RecordEditor object representing a record editor window.
+        The window is not shown or explicitly positioned prior to the
+        constructor returning.
+
+        Takes 5 arguments:
+
+          record          - Record object that will be edited by the window.
+          preview_pixmap  - QPixmap of the photograph that the record is
+                            associated with.
+          window_size     - Optional tuple of (width, height) in pixels
+                            specifying the RecordEditor's window's size.  If
+                            omitted, the window will be big enough to hold its
+                            contents.
+          close_callback  - Optional callback to invoke when the
+                            RecordEditor's window is closed.  If omitted,
+                            defaults to None and no callback will be invoked.
+          commit_callback - Optional callback to invoke when the RecordEditor
+                            has commited changes to the underlying record.  If
+                            omitted, defaults to None and no callback will be
+                            invoked.
+
+        Returns 1 value:
+
+          self - The newly created RecordEditor object.
+
+        """
+        super().__init__()
+
+        self.record          = record
+        self.preview_pixmap  = preview_pixmap
+        self.close_callback  = close_callback
+        self.commit_callback = commit_callback
+
+        self.centralWidget   = None
+
+        self.create_models()
+        self.create_widgets()
+        self.create_layout()
+        self.create_menus()
+        self.set_state()
+
+        if self.centralWidget is not None:
+            self.setCentralWidget( self.centralWidget )
+
+        if window_size is not None:
+            self.resize( *window_size )
+
+    def create_models( self ):
+        """
+        Initializes the internal models needed for a RecordEditor.
+
+        This will be invoked prior to widget creation and layout (see
+        create_widgets() and create_layout()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_widgets( self ):
+        """
+        Creates the widgets needed for a RecordEditor.
+
+        This will be invoked after model creation and prior to widget layout
+        (see create_model() and create_layout()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_layout( self ):
+        """
+        Lays out the widgets within a RecordEditor.
+
+        This will be invoked after models and widgets are created (see
+        create_models() and create_widgets()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_menus( self ):
+        """
+        Creats the menus for a RecordEditor.
+
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def set_state( self ):
+        """
+        Sets the initial state for a RecordEditor.
+
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def commit_record( self ):
+        """
+        Updates the RecordEditor's internal record with user selected values
+        before invoking the parent class' method.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        # run our callback if we have one.
+        if self.commit_callback is not None:
+            self.commit_callback()
+
+    def closeEvent( self, event ):
+        """
+        Handles closing the window by calling the callback specified at window
+        creation.
+
+        Takes 1 argument:
+
+          event - XXX: what is this?
+
+        Returns nothing.
+        """
+
+        # run our callback if we have one.
+        if self.close_callback is not None:
+            self.close_callback()
+
 class PhotoRecordViewer( QMainWindow ):
     def __init__( self ):
         """
@@ -351,6 +494,7 @@ class PhotoRecordViewer( QMainWindow ):
 
                 self.photo_record_editors[photo_id] = PhotoRecordEditor( self.db,
                                                                          photo,
+                                                                         self.photoPreview.pixmap(),
                                                                          close_callback,
                                                                          commit_callback )
                 self.photo_record_editors[photo_id].show()
@@ -451,63 +595,69 @@ class PhotoRecordViewer( QMainWindow ):
             )
         )
 
-class PhotoRecordEditor( QMainWindow ):
+class PhotoRecordEditor( RecordEditor ):
     """
     """
+    # XXX: rearrange the methods - subclassed, event handlers, ours
 
-    def __init__( self, db, photo_record, close_callback=None, commit_callback=None ):
-        """
-        """
+    # XXX: review the calling convention.
+    def __init__( self, db, photo_record, preview_pixmap, close_callback=None, commit_callback=None ):
 
-        super().__init__()
+        self.db          = db
+        self.art_records = db.get_art_records( photo_record["id"] )
+        self.art_regions = dict()
 
-        # track our state.
-        self.db                = db
-        self.photo_record      = photo_record
-
-        self.close_callback    = close_callback
-        self.commit_callback   = commit_callback
-
-        self.art_records       = db.get_art_records( photo_record["id"] )
-
-        self.art_regions       = dict()
-
-        # map keeping track of the open photo editor windows.  each photo
-        # record can only be edited by one window at a time.
+        # map tracking the open photo editor windows.  each photo record can
+        # only be edited by one window at a time.
         self.art_record_editors = dict()
 
-        ################## create models ################
+        super().__init__( photo_record, preview_pixmap, (800, 600), close_callback, commit_callback )
+
+        self.setWindowTitle( "Photo Record Editor: {:s} [{:d}]".format( self.record["filename"],
+                                                                        self.record["id"] ) )
+
+    def create_models( self ):
+        """
+        Initializes the internal models needed for a PhotoRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
 
         # create a model of our photo's art records.
         #
         # NOTE: we keep art id in the model so we can pull it from our
         #       selection and access the record's data.
-        art_model = QStandardItemModel( 0, 2, self )
+        self.artModel = QStandardItemModel( 0, 2, self )
 
-        art_model.setHeaderData( 0, Qt.Horizontal, "Art ID" )
-        art_model.setHeaderData( 1, Qt.Horizontal, "State" )
+        self.artModel.setHeaderData( 0, Qt.Horizontal, "Art ID" )
+        self.artModel.setHeaderData( 1, Qt.Horizontal, "State" )
 
         # walk through each of the photo records and insert a new item at the
         # beginning of the model's list.
         for art in self.art_records:
-            art_model.insertRow( 0 )
-            art_model.setData( art_model.index( 0, 0 ), art["id"] )
-            art_model.setData( art_model.index( 0, 1 ), art["state"] )
+            self.artModel.insertRow( 0 )
+            self.artModel.setData( self.artModel.index( 0, 0 ), art["id"] )
+            self.artModel.setData( self.artModel.index( 0, 1 ), art["state"] )
 
-        self.artModel = art_model
+        # create the proxy model for filtering our data based on record
+        # processing state.
+        self.proxyArtModel = QSortFilterProxyModel()
+        self.proxyArtModel.setFilterKeyColumn( 1 )
+        self.proxyArtModel.setSourceModel( self.artModel )
 
-        # create the proxy model for filtering our data based on record state
-        proxy_model = QSortFilterProxyModel()
-        proxy_model.setFilterKeyColumn( 1 )
-        proxy_model.setSourceModel( art_model )
-        self.proxyArtModel = proxy_model
+    def create_widgets( self ):
+        """
+        Creates the widgets needed for a PhotoRecordEditor.
 
-        # create our widgets.
+        Takes no arguments.
 
+        Returns nothing.
+        """
         #    photo preview.
-        pixmap = get_pixmap_from_image( photo_record["filename"] )
         self.photoPreview = QLabel()
-        self.photoPreview.setPixmap( pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
+        self.photoPreview.setPixmap( self.preview_pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
 
         # draw the art record regions.
         # XXX: factor this into a separate routine
@@ -538,28 +688,40 @@ class PhotoRecordEditor( QMainWindow ):
                 self.art_regions[art["id"]] = rubber_band
 
         #    processing type.
-        selection_box     = QComboBox()
-        self.selectionBox = selection_box
+        self.selectionBox = QComboBox()
 
-        selection_box.addItem( "all", "all" )
+        self.selectionBox.addItem( "all", "all" )
         for state in self.db.get_processing_states():
-            selection_box.addItem( state, state )
+            self.selectionBox.addItem( state, state )
 
-        selection_box.activated.connect( self.selectionTypeActivation )
+        self.selectionBox.activated.connect( self.selectionTypeActivation )
 
-        selection_box_label = QLabel( "&Processing Type:" )
-        selection_box_label.setBuddy( selection_box )
+        self.selectionBoxLabel = QLabel( "&Processing Type:" )
+        self.selectionBoxLabel.setBuddy( self.selectionBox )
 
-        selection_view     = QTreeView()
-        self.selectionView = selection_view
-        selection_view.setModel( proxy_model )
-        selection_view.activated.connect( self.selectionActivation )
-        selection_view.selectionModel().selectionChanged.connect( self.selectionChange )
-        selection_view.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        selection_view.setAlternatingRowColors( True )
-        selection_view.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        selection_view.setSortingEnabled( True )
-        selection_view.header().setSectionsMovable( False )
+        #   art record selection.
+        #
+        #   XXX: describe these.
+        self.selectionView = QTreeView()
+        self.selectionView.setModel( self.proxyArtModel )
+        self.selectionView.activated.connect( self.selectionActivation )
+        self.selectionView.selectionModel().selectionChanged.connect( self.selectionChange )
+        self.selectionView.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.selectionView.setAlternatingRowColors( True )
+        self.selectionView.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.selectionView.setSortingEnabled( True )
+        self.selectionView.header().setSectionsMovable( False )
+
+        #   record addition and removal buttons.
+        self.newRecordButton = QPushButton( "&New Record" )
+        self.newRecordButton.clicked.connect( self.create_new_record )
+
+        self.deleteRecordButton = QPushButton( "&Delete Record" )
+        self.deleteRecordButton.clicked.connect( self.delete_record )
+
+        # we shouldn't be able to push the delete button until we have a
+        # record selected.
+        self.deleteRecordButton.setEnabled( False )
 
         # XXX: need to add
         #
@@ -567,7 +729,17 @@ class PhotoRecordEditor( QMainWindow ):
         #  * tag editor
         #  * description
 
-        # create our layouts.
+    def create_layout( self ):
+        """
+        Lays out the widgets within a PhotoRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+        # highlight all of our widgets so we can debug layouts.
+        # XXX: debugging support.
+        self.setStyleSheet( "border: 1px solid black" )
 
         #   vertical layout of the photo preview and everything else.
         main_layout = QVBoxLayout()
@@ -588,37 +760,28 @@ class PhotoRecordEditor( QMainWindow ):
         selection_type_layout = QHBoxLayout()
         selection_type_layout.setContentsMargins( 0, 0, 0, 0 )
         selection_type_layout.setSpacing( 0 )
-        selection_type_layout.addWidget( selection_box_label )
-        selection_type_layout.addWidget( selection_box )
+        selection_type_layout.addWidget( self.selectionBoxLabel )
+        selection_type_layout.addWidget( self.selectionBox )
         selection_type_box = QGroupBox()
         selection_type_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
         selection_type_box.setLayout( selection_type_layout )
 
-        #   record addition and removal buttons.
-        new_record_button = QPushButton( "&New Record" )
-        new_record_button.clicked.connect( self.create_new_record )
-        delete_record_button = QPushButton( "&Delete Record" )
-        delete_record_button.clicked.connect( self.delete_record )
-        delete_record_button.setEnabled( False )
-        self.deleteRecordButton = delete_record_button
-
         record_modification_layout = QHBoxLayout()
         record_modification_layout.setContentsMargins( 0, 0, 0, 0 )
         record_modification_layout.setSpacing( 0 )
-        record_modification_layout.addWidget( new_record_button )
-        record_modification_layout.addWidget( delete_record_button )
+        record_modification_layout.addWidget( self.newRecordButton )
+        record_modification_layout.addWidget( self.deleteRecordButton )
 
         record_modification_box = QGroupBox()
         record_modification_box.setLayout( record_modification_layout )
         record_modification_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
 
-        selection_layout.addWidget( selection_view )
+        selection_layout.addWidget( self.selectionView )
         selection_layout.addWidget( selection_type_box )
         selection_layout.addWidget( record_modification_box )
 
         selection_box = QGroupBox()
         selection_box.setLayout( selection_layout )
-        selection_box.setStyleSheet( "border: 2px solid black" )
 
         horizontal_layout.addWidget( selection_box )
 
@@ -629,32 +792,54 @@ class PhotoRecordEditor( QMainWindow ):
         main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
         main_layout.addWidget( horizontal_box )
 
-        main_box = QGroupBox()
-        main_box.setLayout( main_layout )
+        self.centralWidget = QGroupBox()
+        self.centralWidget.setLayout( main_layout )
 
-        # create the menu bars.
-        self.createActions()
-        self.createMenus()
+    def create_menus( self ):
+        """
+        Creats the menus for a PhotoRecordEditor.
 
-        # wire up our window contents, set a title, and an initial size.
-        self.setCentralWidget( main_box )
-        self.setWindowTitle( "Photo Record Editor: {:s} [{:d}]".format( photo_record["filename"],
-                                                                        photo_record["id"] ) )
-        self.resize( 800, 600 )
+        Takes no arguments.
 
-    def createActions( self ):
+        Returns nothing.
+        """
+
         self.closeAct = QAction( "&Close", self, shortcut="Ctrl+W",
                                  triggered=self.close )
 
         self.commitAct = QAction( "&Commit", self, shortcut="Ctrl+S",
-                                  triggered=self.commitRecord )
+                                  triggered=self.commit_record )
 
-    def createMenus( self ):
         self.windowMenu = QMenu( "&Window", self )
         self.windowMenu.addAction( self.commitAct )
         self.windowMenu.addAction( self.closeAct )
 
         self.menuBar().addMenu( self.windowMenu )
+
+    def set_state( self ):
+        """
+        Sets the initial state for a PhotoRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def commit_record( self ):
+        """
+        Updates the PhotoRecordEditor's internal record with user selected
+        values before invoking the parent class' method.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+        print( "Commiting photo record #{:d}.".format( self.record["id"] ) )
+
+        # update the record based on what's currently visible.
+        print( "XXX: do this" )
+
+        super().commit_record()
 
     def get_art_id_from_selection( self ):
         """
@@ -677,7 +862,7 @@ class PhotoRecordEditor( QMainWindow ):
     def create_new_record( self ):
         """
         """
-        print( "Create a new art record for photo ID {:d}.".format( self.photo_record["id"] ) )
+        print( "Create a new art record for photo ID {:d}.".format( self.record["id"] ) )
 
     def delete_record( self ):
         """
@@ -772,8 +957,9 @@ class PhotoRecordEditor( QMainWindow ):
                 close_callback = partial( self.remove_art_editor, art_id )
 
                 self.art_record_editors[art_id] = ArtRecordEditor( self.db,
-                                                                   self.photo_record,
+                                                                   self.record["id"],
                                                                    art,
+                                                                   self.photoPreview.pixmap(),
                                                                    close_callback,
                                                                    commit_callback )
                 self.art_record_editors[art_id].show()
@@ -820,59 +1006,55 @@ class PhotoRecordEditor( QMainWindow ):
 
         #self.preview_photo_record( photo_id )
 
-    def closeEvent( self, event ):
-        """
-        Handles closing the window by calling the callback specified at window
-        creation.
-        """
-
-        # run our callback if we have one.
-        if self.close_callback is not None:
-            self.close_callback()
-
-    def commitRecord( self ):
-        """
-        """
-
-        # update the record based on what's currently visible.
-        print( "XXX: do this" )
-
-        print( "Commiting photo record #{:d}.".format( self.photo_record["id"] ) )
-
-        # run our callback if we have one.
-        if self.commit_callback is not None:
-            self.commit_callback()
-
-class ArtRecordEditor( QMainWindow ):
+class ArtRecordEditor( RecordEditor ):
     """
     """
 
-    def __init__( self, db, photo_record, art_record, close_callback=None, commit_callback=None ):
+    # XXX: review the calling convention.
+    def __init__( self, db, photo_id, art_record, preview_pixmap, close_callback=None, commit_callback=None ):
+
+        self.db             = db
+        self.photo_id       = photo_id
+
+        # XXX: we only keep this around until we fix our resizing pixmap situation
+        #      and can initialize it with an existing pixmap (preview_pixmap).
+        self.photo_record   = self.db.get_photo_records( photo_id )
+        print( "Photo record [{}]: {}".format( self.photo_id, self.photo_record ) )
+
+        super().__init__( art_record, preview_pixmap, (800, 600), close_callback, commit_callback )
+
+        self.setWindowTitle( "Art Record Editor: {:s} [{:d}, {:d}]".format( self.photo_record["filename"],
+                                                                            self.photo_id,
+                                                                            self.record["id"] ) )
+
+    def create_models( self ):
         """
+        Initializes the internal models needed for an ArtRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
         """
 
-        super().__init__()
-
-        # track our state.
-        self.db                = db
-        self.photo_record      = photo_record
-        self.art_record        = art_record
-        self.close_callback    = close_callback
-        self.commit_callback   = commit_callback
-
-        # create our artists model.
-        artists_model = QStringListModel( db.get_artists(), self )
+        artists_model     = QStringListModel( self.db.get_artists(), self )
         self.artistsModel = artists_model
 
-        # create our widgets.
-        self.setStyleSheet( "border: 1px solid black" )
+    def create_widgets( self ):
+        """
+        Creates the widgets needed for an ArtRecordEditor.
 
-        #    photo preview.
-        self.photoPreview = grafwidgets.RubberBandedResizingPixmap( photo_record["filename"] )
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        # create a preview of this record's photo.
+        self.photoPreview = grafwidgets.RubberBandedResizingPixmap( self.photo_record["filename"] )
         self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
 
-        if art_record["region"] is not None:
-            normalized_geometry = art_record["region"]
+        # overlay the interactive rubberband box to se
+        if self.record["region"] is not None:
+            normalized_geometry = self.record["region"]
 
             pixmap_size = self.photoPreview.pixmap().size()
 
@@ -894,114 +1076,130 @@ class ArtRecordEditor( QMainWindow ):
             self.photoPreview.banded_region.resize( self.photoPreview.geometry().width() - band_thickness,
                                                     self.photoPreview.geometry().height() - band_thickness )
 
-        type_combo_box       = QComboBox()
-        self.artTypeComboBox = type_combo_box
-        for art_type in db.get_art_types():
-            type_combo_box.addItem( art_type, art_type )
+        # create the combination boxes/line edits and their associated labels
+        # that let the user edit this record.
 
-        type_combo_label     = QLabel( "&Type:" )
-        type_combo_label.setBuddy( type_combo_box )
+        #  art type
+        self.artTypeComboBox   = QComboBox()
+        for art_type in self.db.get_art_types():
+            self.artTypeComboBox.addItem( art_type, art_type )
+        self.artTypeComboLabel = QLabel( "&Type:" )
+        self.artTypeComboLabel.setBuddy( self.artTypeComboBox )
 
-        size_combo_box       = QComboBox()
-        self.artSizeComboBox = size_combo_box
-        for art_size in db.get_art_sizes():
-            size_combo_box.addItem( art_size, art_size )
+        #  art size
+        self.artSizeComboBox   = QComboBox()
+        for art_size in self.db.get_art_sizes():
+            self.artSizeComboBox.addItem( art_size, art_size )
+        self.artSizeComboLabel = QLabel( "&Size:" )
+        self.artSizeComboLabel.setBuddy( self.artSizeComboBox )
 
-        size_combo_label     = QLabel( "&Size:" )
-        size_combo_label.setBuddy( size_combo_box )
+        #  art quality
+        self.artQualityComboBox   = QComboBox()
+        for art_quality in self.db.get_art_qualities():
+            self.artQualityComboBox.addItem( art_quality, art_quality )
+        self.artQualityComboLabel = QLabel( "&Quality:" )
+        self.artQualityComboLabel.setBuddy( self.artQualityComboBox )
 
-        quality_combo_box       = QComboBox()
-        self.artQualityComboBox = quality_combo_box
-        for art_quality in db.get_art_qualities():
-            quality_combo_box.addItem( art_quality, art_quality )
+        #  art date
+        self.artDateLineEdit = QLineEdit( "" )
+        self.artDateLabel    = QLabel( "&Date:" )
+        self.artDateLabel.setBuddy( self.artDateLineEdit )
 
-        quality_combo_label     = QLabel( "&Quality:" )
-        quality_combo_label.setBuddy( quality_combo_box )
+        #  record processing state
+        self.artProcessingStateComboBox = QComboBox()
+        for state in self.db.get_processing_states():
+            self.artProcessingStateComboBox.addItem( state, state )
+        self.artProcessingStateComboLabel = QLabel( "Stat&e:" )
+        self.artProcessingStateComboLabel.setBuddy( self.artProcessingStateComboBox )
 
-        date_line_edit       = QLineEdit( "" )
-        self.artDateLineEdit = date_line_edit
-        date_label           = QLabel( "&Date:" )
-        date_label.setBuddy( date_line_edit )
+        # create the multi-selection views for the artists.
 
-        state_combo_box = QComboBox()
-        self.artProcessingStateComboBox = state_combo_box
-        for state in db.get_processing_states():
-            state_combo_box.addItem( state, state )
+        #  artists
+        self.artArtistsListView = QListView()
+        self.artArtistsListView.setModel( self.artistsModel )
+        self.artArtistsListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
+        self.artArtistsListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
 
-        state_combo_label = QLabel( "Stat&e:" )
-        state_combo_label.setBuddy( state_combo_box )
+        self.artArtistsListLabel = QLabel( "&Artists:" )
+        self.artArtistsListLabel.setBuddy( self.artArtistsListView )
 
-        artists_list_view = QListView()
-        self.artArtistsListView = artists_list_view
-        artists_list_view.setModel( artists_model )
-        artists_list_view.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        artists_list_view.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        artists_list_label = QLabel( "&Artists:" )
-        artists_list_label.setBuddy( artists_list_view )
+        #  associates
+        self.artAssociatesListView = QListView()
+        self.artAssociatesListView.setModel( self.artistsModel )
+        self.artAssociatesListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
+        self.artAssociatesListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
 
-        associates_list_view = QListView()
-        self.artAssociatesListView = associates_list_view
-        associates_list_view.setModel( artists_model )
-        associates_list_view.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        associates_list_view.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        associates_list_label = QLabel( "Ass&ociates:" )
-        associates_list_label.setBuddy( associates_list_view )
+        self.artAssociatesListLabel = QLabel( "Ass&ociates:" )
+        self.artAssociatesListLabel.setBuddy( self.artAssociatesListView )
 
-        vandals_list_view = QListView()
-        self.artVandalsListView = vandals_list_view
-        vandals_list_view.setModel( artists_model )
-        vandals_list_view.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        vandals_list_view.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        vandals_list_label = QLabel( "&Vandals:" )
-        vandals_list_label.setBuddy( vandals_list_view )
+        #  vandals
+        self.artVandalsListView = QListView()
+        self.artVandalsListView.setModel( self.artistsModel )
+        self.artVandalsListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
+        self.artVandalsListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
 
-        # create our layouts.
+        self.artVandalsListLabel = QLabel( "&Vandals:" )
+        self.artVandalsListLabel.setBuddy( self.artVandalsListView )
+
+    def create_layout( self ):
+        """
+        Lays out the widgets within an ArtRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        # highlight all of our widgets so we can debug layouts.
+        # XXX: debugging support.
+        self.setStyleSheet( "border: 1px solid black" )
+
         editing_layout = QGridLayout()
         editing_layout.addWidget( QLabel( "Art Record ID:" ),
                                   0, 0 )
-        editing_layout.addWidget( QLabel( "{:d}".format( art_record["id"] ) ),
+        editing_layout.addWidget( QLabel( "{:d}".format( self.record["id"] ) ),
                                   0, 1 )
 
-        editing_layout.addWidget( type_combo_label,
+        editing_layout.addWidget( self.artTypeComboLabel,
                                   1, 0 )
         editing_layout.addWidget( self.artTypeComboBox,
                                   1, 1 )
 
-        editing_layout.addWidget( size_combo_label,
+        editing_layout.addWidget( self.artSizeComboLabel,
                                   2, 0 )
         editing_layout.addWidget( self.artSizeComboBox,
                                   2, 1 )
 
-        editing_layout.addWidget( quality_combo_label,
+        editing_layout.addWidget( self.artQualityComboLabel,
                                   3, 0 )
         editing_layout.addWidget( self.artQualityComboBox,
                                   3, 1 )
 
-        editing_layout.addWidget( date_label,
+        editing_layout.addWidget( self.artDateLabel,
                                   4, 0 )
         editing_layout.addWidget( self.artDateLineEdit,
                                   4, 1 )
 
-        editing_layout.addWidget( state_combo_label,
+        editing_layout.addWidget( self.artProcessingStateComboLabel,
                                   5, 0 )
         editing_layout.addWidget( self.artProcessingStateComboBox,
                                   5, 1 )
 
-        editing_layout.addWidget( artists_list_label,
+        editing_layout.addWidget( self.artArtistsListLabel,
                                   0, 3 )
-        editing_layout.addWidget( artists_list_view,
+        editing_layout.addWidget( self.artArtistsListView,
                                   1, 3,
                                   4, 1 )
 
-        editing_layout.addWidget( associates_list_label,
+        editing_layout.addWidget( self.artAssociatesListLabel,
                                   0, 5 )
-        editing_layout.addWidget( associates_list_view,
+        editing_layout.addWidget( self.artAssociatesListView,
                                   1, 5,
                                   4, 1 )
 
-        editing_layout.addWidget( vandals_list_label,
+        editing_layout.addWidget( self.artVandalsListLabel,
                                   0, 7 )
-        editing_layout.addWidget( vandals_list_view,
+        editing_layout.addWidget( self.artVandalsListView,
                                   1, 7,
                                   4, 1 )
 
@@ -1017,70 +1215,71 @@ class ArtRecordEditor( QMainWindow ):
         main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
         main_layout.addWidget( editing_box )
 
-        main_box = QGroupBox()
-        main_box.setLayout( main_layout )
+        self.centralWidget = QGroupBox()
+        self.centralWidget.setLayout( main_layout )
 
-        # create the menu bars.
-        self.createActions()
-        self.createMenus()
-
-        # wire up our window contents, set a title, and an initial size.
-        self.setCentralWidget( main_box )
-        self.setWindowTitle( "Art Record Editor: {:s} [{:d}, {:d}]".format( photo_record["filename"],
-                                                                            photo_record["id"],
-                                                                            art_record["id"] ) )
-        self.resize( 800, 600 )
-
-    def closeEvent( self, event ):
+    def create_menus( self ):
         """
-        Handles closing the window by calling the callback specified at window
-        creation.
+        Creats the menus for an ArtRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
         """
 
-        # run our callback if we have one.
-        if self.close_callback is not None:
-            self.close_callback()
-
-    def commitRecord( self ):
-        """
-        """
-
-        # update the record based on what's currently visible.
-        self.art_record["type"]          = self.artTypeComboBox.currentText()
-        self.art_record["size"]          = self.artSizeComboBox.currentText()
-        self.art_record["quality"]       = self.artQualityComboBox.currentText()
-        self.art_record["date"]          = self.artDateLineEdit.text()
-        self.art_record["state"]         = self.artProcessingStateComboBox.currentText()
-        self.art_record["modified_time"] = time.mktime( time.gmtime() )
-
-        self.art_record["artists"]       = [artist.data() for artist in self.artArtistsListView.selectedIndexes()]
-        self.art_record["associates"]    = [associate.data() for associate in self.artAssociatesListView.selectedIndexes()]
-        self.art_record["vandals"]       = [vandal.data() for vandal in self.artVandalsListView.selectedIndexes()]
-
-        # update the region.
-        normalized_geometry = self.photoPreview.get_region_geometry( True )
-
-        self.art_record["region"] = normalized_geometry.getRect()
-
-        print( "Commiting art record #{:d}.".format( self.art_record["id"] ) )
-
-        # run our callback if we have one.
-        if self.commit_callback is not None:
-            self.commit_callback()
-
-    def createActions( self ):
-        self.closeAct = QAction( "C&lose", self, shortcut="Ctrl+W",
-                                 triggered=self.close )
+        self.closeAct  = QAction( "C&lose", self, shortcut="Ctrl+W",
+                                  triggered=self.close )
 
         self.commitAct = QAction( "&Commit", self, shortcut="Ctrl+S",
-                                  triggered=self.commitRecord )
+                                  triggered=self.commit_record )
 
-    def createMenus( self ):
         self.windowMenu = QMenu( "&Window", self )
         self.windowMenu.addAction( self.commitAct )
         self.windowMenu.addAction( self.closeAct )
 
         self.menuBar().addMenu( self.windowMenu )
+
+    def set_state( self ):
+        """
+        Sets the initial state for an ArtRecordEditor.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        # XXX: select things based on the contents of self.record
+
+    def commit_record( self ):
+        """
+        Updates the ArtRecordEditor's internal record with user selected
+        values before invoking the parent class' method.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        print( "Commiting art record #{:d}.".format( self.record["id"] ) )
+
+        # update the record based on what's currently visible.
+        self.record["type"]          = self.artTypeComboBox.currentText()
+        self.record["size"]          = self.artSizeComboBox.currentText()
+        self.record["quality"]       = self.artQualityComboBox.currentText()
+        self.record["date"]          = self.artDateLineEdit.text()
+        self.record["state"]         = self.artProcessingStateComboBox.currentText()
+        self.record["modified_time"] = time.mktime( time.gmtime() )
+
+        self.record["artists"]       = [artist.data() for artist in self.artArtistsListView.selectedIndexes()]
+        self.record["associates"]    = [associate.data() for associate in self.artAssociatesListView.selectedIndexes()]
+        self.record["vandals"]       = [vandal.data() for vandal in self.artVandalsListView.selectedIndexes()]
+
+        # update the region.
+        normalized_geometry = self.photoPreview.get_region_geometry( True )
+
+        self.record["region"] = normalized_geometry.getRect()
+
+        super().commit_record()
 
 @lru_cache( maxsize=16 )
 def get_pixmap_from_image( filename ):
