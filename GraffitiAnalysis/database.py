@@ -61,25 +61,25 @@ def _read_memory_database( ):
               PhotoRecord( 4, "images/P9430585.JPG", (4112, 3884), "reviewed", (0,0), 0, 1468507638, 1468507638, [] ),
               PhotoRecord( 5, "images/P9440028.JPG", (4112, 3884), "unreviewed", (0,0), 0, 1468507546, 1468507546, [] ),
               PhotoRecord( 6, "images/P9470260.JPG", (4112, 3884), "needs_review", (0,0), 0, 1468507567, 1468507567, [] )]
-    art    = [ArtRecord( 1, 1, "throwup", ["Daru"],    [], "large", "good", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 2, 1, "throwup", ["Amoz"],    [], "large", "fair", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 3, 1, "throwup", ["EWO"],     [], "large", "fair", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 4, 1, "throwup", ["Unknown"], [], "large", "poor", [], 1234, 1234, None, "reviewed" ),
+    art    = [ArtRecord( 1, 1, "throwup", ["Daru"],    [], "large", "good", [], 1234, 1234, None, "reviewed", (0.2, 0.13924050632911392, 0.7142857142857143, 0.3291139240506329) ),
+              ArtRecord( 2, 1, "throwup", ["Amoz"],    [], "large", "fair", [], 1234, 1234, None, "reviewed", (0.24952380952380954, 0.41012658227848103, 0.3219047619047619, 0.3012658227848101) ),
+              ArtRecord( 3, 1, "throwup", ["EWO"],     [], "large", "fair", [], 1234, 1234, None, "reviewed", (0.5619047619047619, 0.3569620253164557, 0.42857142857142855, 0.3367088607594937) ),
+              ArtRecord( 4, 1, "throwup", ["Unknown"], [], "large", "poor", [], 1234, 1234, None, "reviewed", (0.015238095238095238, 0.4, 0.26476190476190475, 0.29873417721518986) ),
 
-              ArtRecord( 5, 2, "wild_style", ["Fuck"], [], "huge", "excellent", [], 1234, 1234, "2016", "reviewed" ),
+              ArtRecord( 5, 2, "wild_style", ["Fuck"], [], "huge", "excellent", [], 1234, 1234, "2016", "reviewed", (0.02857142857142857, 0.31645569620253167, 0.9352380952380952, 0.37721518987341773) ),
 
-              ArtRecord( 6, 3, "throwup", ["Badu"], ["PBR", "Zebra"], "large", "excellent", [], 1234, 1234, "2016", "reviewed" ),
-              ArtRecord( 7, 3, "tag",     ["Badu"], [],               "small", "good", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 8, 3, "tag",     ["Badu"], [],               "small", "good", [], 1234, 1234, None, "reviewed" ),
+              ArtRecord( 6, 3, "throwup", ["Badu"], ["PBR", "Zebra"], "large", "excellent", [], 1234, 1234, "2016", "reviewed", (0.0419047619047619, 0.002531645569620253, 0.8819047619047619, 0.9772151898734177) ),
+              ArtRecord( 7, 3, "tag",     ["Badu"], [],               "small", "good", [], 1234, 1234, None, "reviewed", (0.878095238095238, 0.6177215189873417, 0.10857142857142857, 0.10886075949367088) ),
+              ArtRecord( 8, 3, "tag",     ["Badu"], [],               "small", "good", [], 1234, 1234, None, "reviewed", (0.8838095238095238, 0.1189873417721519, 0.10857142857142857, 0.10126582278481013) ),
 
-              ArtRecord( 9, 4,  "throwup", ["PBR"], ["PBR", "Drip"], "small", "good", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 10, 4, "tag",     ["Drip"],             [], "small", "fair", [], 1234, 1234, None, "reviewed" ),
-              ArtRecord( 11, 4, "tag",     ["MR", "Unknown"],    [], "small", "fair", [], 1234, 1234, None, "needs_review" ),
+              ArtRecord( 9, 4,  "throwup", ["PBR"], ["PBR", "Drip"], "small", "good", [], 1234, 1234, None, "reviewed", (0.0019047619047619048, 0.22025316455696203, 0.9447619047619048, 0.5569620253164557) ),
+              ArtRecord( 10, 4, "tag",     ["Drip"],             [], "small", "fair", [], 1234, 1234, None, "reviewed", (0.7695238095238095, 0.5341772151898734, 0.12761904761904763, 0.10126582278481013) ),
+              ArtRecord( 11, 4, "tag",     ["MR", "Unknown"],    [], "small", "fair", [], 1234, 1234, None, "needs_review", (0.7847619047619048, 0.6481012658227848, 0.09523809523809523, 0.1620253164556962) ),
 
-              ArtRecord( 12, 5, "wild_style", ["Unknown"], ["Rulof"], "huge", "good", [], 1234, 1234, None, "needs_review" ),
+              ArtRecord( 12, 5, "wild_style", ["Unknown"], ["Rulof"], "huge", "good", [], 1234, 1234, None, "needs_review", (0.0019047619047619048, 0.2481012658227848, 1.0, 0.47341772151898737) ),
 
-              ArtRecord( 13, 6, "mural", ["HBD"], ["Omar"], "large", "fair", [], 1234, 1234, "2014/11/21", "reviewed" ),
-              ArtRecord( 14, 6, "text",  ["HBD"], [],       "small", "good", [], 1234, 1234, "2014/11/21", "reviewed" )]
+              ArtRecord( 13, 6, "mural", ["HBD"], ["Omar"], "large", "fair", [], 1234, 1234, "2014/11/21", "reviewed", (0.08, 0.3189873417721519, 0.4247619047619048, 0.4253164556962025) ),
+              ArtRecord( 14, 6, "text",  ["HBD"], [],       "small", "good", [], 1234, 1234, "2014/11/21", "reviewed", (0.4, 0.3240506329113924, 0.4266666666666667, 0.379746835443038) )]
 
     return ({ "types":     art_types,
               "sizes":     art_sizes,
