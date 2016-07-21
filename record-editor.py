@@ -510,15 +510,29 @@ class PhotoRecordEditor( QMainWindow ):
         self.photoPreview.setPixmap( pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
 
         # draw the art record regions.
+        # XXX: factor this into a separate routine
         for art in self.art_records:
             if art["region"] is not None:
-                geometry = art["region"]
-                size     = (geometry[2] - geometry[0] + 1,
-                            geometry[3] - geometry[1] + 1)
-                rubber_band = QRubberBand( QRubberBand.Rectangle, self.photoPreview )
+                # remove an existing rubber band associated with this record if
+                # we have one.
+                if art["id"] in self.art_regions:
+                    self.art_regions[art["id"]].hide()
+                    # XXX: do we need to delete this?
 
-                rubber_band.move( geometry[0], geometry[1] )
-                rubber_band.resize( size[0], size[1] )
+                # pull our normalized geometry.  note that this is a tuple rather
+                # than a QRect()/QRectF() object.
+                normalized_geometry = art["region"]
+
+                pixmap_size = self.photoPreview.pixmap().size()
+
+                # map our normalized geometry to our pixmap's dimensions.
+                geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
+                                  round( normalized_geometry[1] * pixmap_size.height() ),
+                                  round( normalized_geometry[2] * pixmap_size.width() ),
+                                  round( normalized_geometry[3] * pixmap_size.height() ) )
+
+                rubber_band = QRubberBand( QRubberBand.Rectangle, self.photoPreview )
+                rubber_band.setGeometry( geometry )
                 rubber_band.show()
 
                 self.art_regions[art["id"]] = rubber_band
@@ -681,6 +695,7 @@ class PhotoRecordEditor( QMainWindow ):
     def refresh_art_record( self, art_id ):
         print( "Need to refresh art record #{:d}.".format( art_id ) )
 
+        # XXX: factor this into a separate routine
         for art in self.art_records:
             if art["id"] == art_id:
                 if art["region"] is not None:
@@ -857,18 +872,25 @@ class ArtRecordEditor( QMainWindow ):
         self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
 
         if art_record["region"] is not None:
-            region = art_record["region"]
-            size   = (region[2] - region[0] + 1,
-                      region[3] - region[1] + 1)
+            normalized_geometry = art_record["region"]
 
-            self.photoPreview.banded_region.move( region[0], region[1] )
-            self.photoPreview.banded_region.resize( size[0], size[1] )
+            pixmap_size = self.photoPreview.pixmap().size()
+
+            # map our normalized geometry to our pixmap's dimensions.
+            geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
+                              round( normalized_geometry[1] * pixmap_size.height() ),
+                              round( normalized_geometry[2] * pixmap_size.width() ),
+                              round( normalized_geometry[3] * pixmap_size.height() ) )
+
+            # XXX: abusing the interface
+            self.photoPreview.banded_region.setGeometry( geometry )
         else:
             # start the rubberband region covering the entirety of the photo.
             # this provides a sensible default if the user doesn't change it
             # before commiting the record.
             band_thickness = 4
 
+            # XXX: abusing the interface
             self.photoPreview.banded_region.resize( self.photoPreview.geometry().width() - band_thickness,
                                                     self.photoPreview.geometry().height() - band_thickness )
 
