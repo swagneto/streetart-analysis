@@ -16,6 +16,8 @@
 #   * factor out the code in PhotoRecordViewer.__init__()
 #      - need constants for the treeview columns
 #   * factor out the rubberband overlay setup code in refresh_art_record()
+#   * Pixmap passed from PhotoRecordViewer to PhotoRecordEditor needs to be
+#     the held reference rather than a new one.
 #
 # Functionality:
 #
@@ -42,6 +44,8 @@
 #   * [IN PROGRESS] tree view columns need to be sized properly
 #   * relative sizing of stats box labels needs to be sized properly (and not
 #     encroach on the selection view).
+#   * do we need to set the content margins and spacing on every widget, or does
+#     it propagate downward in a layout?
 
 from functools import lru_cache, partial
 import time
@@ -58,8 +62,125 @@ from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
 import GraffitiAnalysis.database as grafdb
 import GraffitiAnalysis.widgets as grafwidgets
 
-class RecordEditor( QMainWindow ):
+class RecordWindow( QMainWindow ):
+    def __init__( self, window_size=None, close_callback=None ):
+        """
+        Constructs a RecordWindow object representing a basic window.  The
+        window is not shown or explicitly positioned prior to the constructor
+        returning.
+
+        Takes 2 arguments:
+
+          window_size     - Optional tuple of (width, height) in pixels
+                            specifying the RecordEditor's window's size.  If
+                            omitted, the window will be big enough to hold its
+                            contents.
+          close_callback  - Optional callback to invoke when the
+                            RecordEditor's window is closed.  If omitted,
+                            defaults to None and no callback will be invoked.
+
+        Returns 1 value:
+
+          self - The newly created RecordWindow object.
+
+        """
+        super().__init__()
+
+        self.close_callback  = close_callback
+
+        self.centralWidget   = None
+
+        self.create_models()
+        self.create_widgets()
+        self.create_layout()
+        self.create_menus()
+        self.set_state()
+
+        if self.centralWidget is not None:
+            self.setCentralWidget( self.centralWidget )
+
+        if window_size is not None:
+            self.resize( *window_size )
+
+    def create_models( self ):
+        """
+        Initializes the internal models needed for a RecordWindow.
+
+        This will be invoked prior to widget creation and layout (see
+        create_widgets() and create_layout()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_widgets( self ):
+        """
+        Creates the widgets needed for a RecordWindow.
+
+        This will be invoked after model creation and prior to widget layout
+        (see create_model() and create_layout()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_layout( self ):
+        """
+        Lays out the widgets within a RecordWindow.
+
+        This will be invoked after models and widgets are created (see
+        create_models() and create_widgets()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def create_menus( self ):
+        """
+        Creats the menus for a RecordWindow.
+
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def set_state( self ):
+        """
+        Sets the initial state for a RecordWindow.
+
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+    def closeEvent( self, event ):
+        """
+        Handles closing the window by calling the callback specified at window
+        creation.
+
+        Takes 1 argument:
+
+          event - XXX: what is this?
+
+        Returns nothing.
+        """
+
+        # run our callback if we have one.
+        if self.close_callback is not None:
+            self.close_callback()
+
+class RecordEditor( RecordWindow ):
     """
+    XXX: RecordEditor's have a record, a preview, and commit_record() method.
     """
 
     def __init__( self, record, preview_pixmap, window_size=None, close_callback=None, commit_callback=None ):
@@ -90,86 +211,12 @@ class RecordEditor( QMainWindow ):
           self - The newly created RecordEditor object.
 
         """
-        super().__init__()
 
         self.record          = record
         self.preview_pixmap  = preview_pixmap
-        self.close_callback  = close_callback
         self.commit_callback = commit_callback
 
-        self.centralWidget   = None
-
-        self.create_models()
-        self.create_widgets()
-        self.create_layout()
-        self.create_menus()
-        self.set_state()
-
-        if self.centralWidget is not None:
-            self.setCentralWidget( self.centralWidget )
-
-        if window_size is not None:
-            self.resize( *window_size )
-
-    def create_models( self ):
-        """
-        Initializes the internal models needed for a RecordEditor.
-
-        This will be invoked prior to widget creation and layout (see
-        create_widgets() and create_layout()).
-
-        Takes no arguments.
-
-        Returns nothing.
-        """
-
-    def create_widgets( self ):
-        """
-        Creates the widgets needed for a RecordEditor.
-
-        This will be invoked after model creation and prior to widget layout
-        (see create_model() and create_layout()).
-
-        Takes no arguments.
-
-        Returns nothing.
-        """
-
-    def create_layout( self ):
-        """
-        Lays out the widgets within a RecordEditor.
-
-        This will be invoked after models and widgets are created (see
-        create_models() and create_widgets()).
-
-        Takes no arguments.
-
-        Returns nothing.
-        """
-
-    def create_menus( self ):
-        """
-        Creats the menus for a RecordEditor.
-
-        This will be invoked after the models are created and widgets are laid
-        out (see create_models(), create_widgets(), and create_layouts()).
-
-        Takes no arguments.
-
-        Returns nothing.
-        """
-
-    def set_state( self ):
-        """
-        Sets the initial state for a RecordEditor.
-
-        This will be invoked after the models are created and widgets are laid
-        out (see create_models(), create_widgets(), and create_layouts()).
-
-        Takes no arguments.
-
-        Returns nothing.
-        """
+        super().__init__( window_size, close_callback )
 
     def commit_record( self ):
         """
@@ -185,29 +232,14 @@ class RecordEditor( QMainWindow ):
         if self.commit_callback is not None:
             self.commit_callback()
 
-    def closeEvent( self, event ):
-        """
-        Handles closing the window by calling the callback specified at window
-        creation.
+class PhotoRecordViewer( RecordWindow ):
+    """
+    """
 
-        Takes 1 argument:
-
-          event - XXX: what is this?
-
-        Returns nothing.
-        """
-
-        # run our callback if we have one.
-        if self.close_callback is not None:
-            self.close_callback()
-
-class PhotoRecordViewer( QMainWindow ):
     def __init__( self ):
         """
-        Main window constructor.
+        XXX
         """
-
-        super().__init__()
 
         # set the state for the window.
         self.db     = grafdb.Database( None )
@@ -217,50 +249,71 @@ class PhotoRecordViewer( QMainWindow ):
         # record can only be edited by one window at a time.
         self.photo_record_editors = dict()
 
-        ################## create models ################
+        # XXX: specify a callback to save the database.
+        super().__init__( (800, 600), None )
+
+        self.setWindowTitle( "Photo Record Editor" )
+        self.show()
+
+    def create_models( self ):
+        """
+        Initializes the internal models needed for a PhotoRecordViewer.
+
+        This will be invoked prior to widget creation and layout (see
+        create_widgets() and create_layout()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
 
         # create a model of our photo records.
         #
         # NOTE: we keep photo id in the model so we can pull it from our
         #       selection and access the record's data.
-        photos_model = QStandardItemModel( 0, 3, self )
+        #
+        self.photosModel = QStandardItemModel( 0, 3, self )
 
-        photos_model.setHeaderData( 0, Qt.Horizontal, "Photo ID" )
-        photos_model.setHeaderData( 1, Qt.Horizontal, "File Path" )
-        photos_model.setHeaderData( 2, Qt.Horizontal, "State" )
+        self.photosModel.setHeaderData( 0, Qt.Horizontal, "Photo ID" )
+        self.photosModel.setHeaderData( 1, Qt.Horizontal, "File Path" )
+        self.photosModel.setHeaderData( 2, Qt.Horizontal, "State" )
 
         # walk through each of the photo records and insert a new item at the
         # beginning of the model's list.
         for photo in self.photos:
-            photos_model.insertRow( 0 )
-            photos_model.setData( photos_model.index( 0, 0 ), photo["id"] )
-            photos_model.setData( photos_model.index( 0, 1 ), photo["filename"] )
-            photos_model.setData( photos_model.index( 0, 2 ), photo["state"] )
+            self.photosModel.insertRow( 0 )
+            self.photosModel.setData( self.photosModel.index( 0, 0 ), photo["id"] )
+            self.photosModel.setData( self.photosModel.index( 0, 1 ), photo["filename"] )
+            self.photosModel.setData( self.photosModel.index( 0, 2 ), photo["state"] )
 
-        self.photosModel = photos_model
+        # create the proxy model for filtering our data based on record
+        # processing state.
+        self.proxyPhotosModel = QSortFilterProxyModel()
+        self.proxyPhotosModel.setFilterKeyColumn( 2 )
+        self.proxyPhotosModel.setSourceModel( self.photosModel )
 
-        # create the proxy model for filtering our data based on record state
-        proxy_model = QSortFilterProxyModel()
-        proxy_model.setFilterKeyColumn( 2 )
-        proxy_model.setSourceModel( photos_model )
-        self.proxyPhotosModel = proxy_model
+    def create_widgets( self ):
+        """
+        Creates the widgets needed for a PhotoRecordViewer.
 
-        #############################
+        This will be invoked after model creation and prior to widget layout
+        (see create_model() and create_layout()).
 
-        ###################### create widgets ########################
+        Takes no arguments.
 
-        # XXX: factor these
-        selection_view     = QTreeView()
-        self.selectionView = selection_view
-        selection_view.setModel( proxy_model )
-        selection_view.activated.connect( self.selectionActivation )
-        selection_view.selectionModel().selectionChanged.connect( self.selectionChange )
-        selection_view.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        selection_view.setAlternatingRowColors( True )
-        selection_view.setColumnHidden( 0, True ) # hide the ID
-        selection_view.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
-        selection_view.setSortingEnabled( True )
-        selection_view.resizeColumnToContents( 1 )
+        Returns nothing.
+        """
+
+        self.selectionView = QTreeView()
+        self.selectionView.setModel( self.proxyPhotosModel )
+        self.selectionView.activated.connect( self.selectionActivation )
+        self.selectionView.selectionModel().selectionChanged.connect( self.selectionChange )
+        self.selectionView.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.selectionView.setAlternatingRowColors( True )
+        self.selectionView.setColumnHidden( 0, True ) # hide the ID
+        self.selectionView.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
+        self.selectionView.setSortingEnabled( True )
+        self.selectionView.resizeColumnToContents( 1 )
 
         # configure the column headers.
         # XXX: these don't quite work.  stretching the last section prevents the
@@ -270,39 +323,37 @@ class PhotoRecordViewer( QMainWindow ):
         #      specifying QHeaderView.{Stretch,ResizeToContents} disables any
         #      interactive or programmatic modification of the column sizes.
         #
-#        selection_view.header().setStretchLastSection( True ) # have the state column fill space - XXX not quite what we want
-#        selection_view.header().setSectionResizeMode( 0, QHeaderView.Stretch )
-#        selection_view.header().setSectionResizeMode( 1, QHeaderView.ResizeToContents )
-#        selection_view.header().setSectionResizeMode( 2, QHeaderView.Stretch )
+#        self.selectionView.header().setStretchLastSection( True ) # have the state column fill space - XXX not quite what we want
+#        self.selectionView.header().setSectionResizeMode( 0, QHeaderView.Stretch )
+#        self.selectionView.header().setSectionResizeMode( 1, QHeaderView.ResizeToContents )
+#        self.selectionView.header().setSectionResizeMode( 2, QHeaderView.Stretch )
 
 #        self.selectionView.setAllColumnsShowFocus( True )
- #       self.selectionView.keyPressEvent = self.keyPressEvent # XXX: don't do this, it eats keys
+#        self.selectionView.keyPressEvent = self.keyPressEvent # XXX: don't do this, it eats keys
 
         # prevent the users from rearranging the columns.
-        selection_view.header().setSectionsMovable( False )
+        self.selectionView.header().setSectionsMovable( False )
 
-        selection_box     = QComboBox()
-        self.selectionBox = selection_box
+        self.selectionBox = QComboBox()
 
-        selection_box.addItem( "all", "all" )
+        self.selectionBox.addItem( "all", "all" )
         for state in self.db.get_processing_states():
-            selection_box.addItem( state, state )
+            self.selectionBox.addItem( state, state )
 
-        selection_box.activated.connect( self.selectionTypeActivation )
+        self.selectionBox.activated.connect( self.selectionTypeActivation )
 
-        selection_box_label = QLabel( "&Processing Type:" )
-        selection_box_label.setBuddy( selection_box )
+        self.selectionBoxLabel = QLabel( "&Processing Type:" )
+        self.selectionBoxLabel.setBuddy( self.selectionBox )
 
-        photo_preview     = QLabel()
-        self.photoPreview = photo_preview
+        self.photoPreview = QLabel()
 
-        photo_preview.setBackgroundRole( QPalette.Base )
+        self.photoPreview.setBackgroundRole( QPalette.Base )
         # XXX: why is a preferred size policy with a minimum size better than
         #      ignored with minimum?  the latter causes the image to overflow into
         #      the label area and hide it unless the window is resized.
-        photo_preview.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
-        photo_preview.setScaledContents( True )
-        photo_preview.setMinimumSize( 400, 300 )
+        self.photoPreview.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
+        self.photoPreview.setScaledContents( True )
+        self.photoPreview.setMinimumSize( 400, 300 )
 
         # XXX: change these defaults
         self.infoStateLabel      = QLabel()
@@ -313,36 +364,35 @@ class PhotoRecordViewer( QMainWindow ):
         self.infoModifiedLabel   = QLabel()
         self.infoTagsLabel       = QLabel()
 
-        self.infoStateLabel.setStyleSheet( "border: 2px solid black" )
+    def create_layout( self ):
+        """
+        Lays out the widgets within a PhotoRecordViewer.
 
-        # select the first entry.
-        #
-        # NOTE: we have to do this after all widgets are created, otherwise
-        #       we are likely to crash.
-        #
-        # XXX: if this is commented out
-        #selection_view.setCurrentIndex( proxy_model.index( 0, 0 ) )
-        #self.selectionView.setFocus( True )
+        This will be invoked after models and widgets are created (see
+        create_models() and create_widgets()).
 
-        ##################### lay widgets out ######################
+        Takes no arguments.
 
-        # create layout
+        Returns nothing.
+        """
+
+        # XXX: debugging layout
+        self.setStyleSheet( "border: 1px solid black" )
+
         selection_layout = QVBoxLayout()
         selection_layout.setContentsMargins( 0, 0, 0, 0 )
         selection_layout.setSpacing( 0 )
+        selection_layout.addWidget( self.selectionView )
 
-        selection_layout.addWidget( selection_view )
-
-        # XXX: don't need to be stored as global state
-        self.recordSelectionBox = QGroupBox()
-        self.recordSelectionBox.setLayout( selection_layout )
-        self.recordSelectionBox.setStyleSheet( "border: 2px solid black" )
+        record_selection_box = QGroupBox()
+        record_selection_box.setLayout( selection_layout )
 
         selection_type_layout = QHBoxLayout()
         selection_type_layout.setContentsMargins( 0, 0, 0, 0 )
         selection_type_layout.setSpacing( 0 )
-        selection_type_layout.addWidget( selection_box_label )
-        selection_type_layout.addWidget( selection_box )
+        selection_type_layout.addWidget( self.selectionBoxLabel )
+        selection_type_layout.addWidget( self.selectionBox )
+
         selection_type_box = QGroupBox()
         selection_type_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
         selection_type_box.setLayout( selection_type_layout )
@@ -353,60 +403,113 @@ class PhotoRecordViewer( QMainWindow ):
         info_layout.setContentsMargins( 0, 0, 0, 0 )
         info_layout.setSpacing( 0 )
 
-        self.recordInformationBox = QGroupBox()
-        self.recordInformationBox.setLayout( info_layout )
-        self.recordInformationBox.setStyleSheet( "border: 2px solid black" )
+        record_information_box = QGroupBox()
+        record_information_box.setLayout( info_layout )
 
         stats_box    = QGroupBox()
         stats_layout = QGridLayout()
         stats_layout.setContentsMargins( 0, 0, 0, 0 )
         stats_layout.setSpacing( 0 )
 
-        stats_layout.addWidget( QLabel( "State:" ), 0, 0 )
-        stats_layout.addWidget( self.infoStateLabel, 0, 1 )
+        stats_layout.addWidget( QLabel( "State:" ),
+                                0, 0 )
+        stats_layout.addWidget( self.infoStateLabel,
+                                0, 1 )
 
-        stats_layout.addWidget( QLabel( "Location:" ), 1, 0 )
-        stats_layout.addWidget( self.infoLocationLabel, 1, 1 )
+        stats_layout.addWidget( QLabel( "Location:" ),
+                                1, 0 )
+        stats_layout.addWidget( self.infoLocationLabel,
+                                1, 1 )
 
-        stats_layout.addWidget( QLabel( "Address:" ), 2, 0 )
-        stats_layout.addWidget( self.infoAddressLabel, 2, 1 )
+        stats_layout.addWidget( QLabel( "Address:" ),
+                                2, 0 )
+        stats_layout.addWidget( self.infoAddressLabel,
+                                2, 1 )
 
-        stats_layout.addWidget( QLabel( "Resolution:" ), 3, 0 )
-        stats_layout.addWidget( self.infoResolutionLabel, 3, 1 )
+        stats_layout.addWidget( QLabel( "Resolution:" ),
+                                3, 0 )
+        stats_layout.addWidget( self.infoResolutionLabel,
+                                3, 1 )
 
-        stats_layout.addWidget( QLabel( "Created:" ), 4, 0 )
-        stats_layout.addWidget( self.infoCreatedLabel, 4, 1 )
+        stats_layout.addWidget( QLabel( "Created:" ),
+                                4, 0 )
+        stats_layout.addWidget( self.infoCreatedLabel,
+                                4, 1 )
 
-        stats_layout.addWidget( QLabel( "Modified:" ), 5, 0 )
-        stats_layout.addWidget( self.infoModifiedLabel, 5, 1 )
+        stats_layout.addWidget( QLabel( "Modified:" ),
+                                5, 0 )
+        stats_layout.addWidget( self.infoModifiedLabel,
+                                5, 1 )
 
-        stats_layout.addWidget( QLabel( "Tags:" ), 6, 0 )
-        stats_layout.addWidget( self.infoTagsLabel, 6, 1 )
+        stats_layout.addWidget( QLabel( "Tags:" ),
+                                6, 0 )
+        stats_layout.addWidget( self.infoTagsLabel,
+                                6, 1 )
 
         stats_box.setLayout( stats_layout )
 
-        info_layout.addWidget( photo_preview )
+        info_layout.addWidget( self.photoPreview )
         info_layout.addWidget( stats_box )
 
-        ###############################
-
-
         main_layout = QHBoxLayout()
-        main_layout.addWidget( self.recordSelectionBox )
-        main_layout.addWidget( self.recordInformationBox )
+        main_layout.addWidget( record_selection_box )
+        main_layout.addWidget( record_information_box )
         main_layout.setContentsMargins( 0, 0, 0, 0 )
         main_layout.setSpacing( 0 )
 
-        main_box = QGroupBox()
-        main_box.setLayout( main_layout )
+        self.centralWidget = QGroupBox()
+        self.centralWidget.setLayout( main_layout )
 
-        self.setCentralWidget( main_box )
+    def create_menus( self ):
+        """
+        Creats the menus for a PhotoRecordViewer.
 
-        self.createActions()
-        self.createMenus()
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
 
-        self.setWindowTitle( "Photo Record Editor" )
-        self.resize( 800, 600 )
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        self.exitAct = QAction( "E&xit", self, shortcut="Ctrl+Q",
+                                triggered=self.close )
+
+        self.aboutAct = QAction( "&About", self, triggered=self.about )
+
+        self.aboutQtAct = QAction( "About &Qt", self,
+                                   triggered=QApplication.instance().aboutQt )
+
+        self.fileMenu = QMenu( "&File", self )
+        self.fileMenu.addAction( self.exitAct )
+
+        self.helpMenu = QMenu( "&Help", self )
+        self.helpMenu.addAction( self.aboutAct )
+        self.helpMenu.addAction( self.aboutQtAct )
+
+        self.menuBar().addMenu( self.fileMenu )
+        self.menuBar().addMenu( self.helpMenu )
+
+    def set_state( self ):
+        """
+        Sets the initial state for a PhotoRecordViewer.
+
+        This will be invoked after the models are created and widgets are laid
+        out (see create_models(), create_widgets(), and create_layouts()).
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        # select the first entry.
+        #
+        # NOTE: we have to do this after all widgets are created, otherwise
+        #       we are likely to crash.
+        #
+        # XXX: if this is commented out
+        #selection_view.setCurrentIndex( proxy_model.index( 0, 0 ) )
+        #self.selectionView.setFocus( True )
 
     def get_photo_id_from_selection( self ):
         """
@@ -434,7 +537,7 @@ class PhotoRecordViewer( QMainWindow ):
     def refresh_photo_record( self, photo_id ):
         print( "Need to refresh photo record #{:d}.".format( photo_id ) )
 
-        photo_record = self.db.get_photo_records( [photo_id] )[0]
+        photo_record = self.db.get_photo_records( photo_id )
 
         print( photo_record["filename"] )
         print( photo_record["id"] )
@@ -492,9 +595,10 @@ class PhotoRecordViewer( QMainWindow ):
                 # ... and cleanup our state when finished editing.
                 close_callback = partial( self.remove_photo_editor, photo_id )
 
+                # XXX: there is a better way to pass the photo in.
                 self.photo_record_editors[photo_id] = PhotoRecordEditor( self.db,
                                                                          photo,
-                                                                         self.photoPreview.pixmap(),
+                                                                         get_pixmap_from_image( photo["filename"] ),
                                                                          close_callback,
                                                                          commit_callback )
                 self.photo_record_editors[photo_id].show()
@@ -559,26 +663,6 @@ class PhotoRecordViewer( QMainWindow ):
     def about( self ):
         QMessageBox.about( self, "About Record Editor",
                            "XXX: Things go here.")
-
-    def createActions( self ):
-        self.exitAct = QAction( "E&xit", self, shortcut="Ctrl+Q",
-                                triggered=self.close )
-
-        self.aboutAct = QAction( "&About", self, triggered=self.about )
-
-        self.aboutQtAct = QAction( "About &Qt", self,
-                                   triggered=QApplication.instance().aboutQt )
-
-    def createMenus( self ):
-        self.fileMenu = QMenu( "&File", self )
-        self.fileMenu.addAction( self.exitAct )
-
-        self.helpMenu = QMenu( "&Help", self )
-        self.helpMenu.addAction( self.aboutAct )
-        self.helpMenu.addAction( self.aboutQtAct )
-
-        self.menuBar().addMenu( self.fileMenu )
-        self.menuBar().addMenu( self.helpMenu )
 
     # XXX: delete me
     def keyPressEvent(self, event):
