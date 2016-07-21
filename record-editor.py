@@ -1,21 +1,47 @@
 #!/usr/bin/env python
 
-# Todo:
+# Broken:
 #
+#   * Saving a photo record explodes (singleton helper change in get_photo_record())
 #   * X'ing out of art record editor doesn't do the cleanup?
-#   * sort the contents of the treeview
-#   ~ tree view columns need to be sized properly
-#   * relative sizing of stats box labels needs to be sized properly (and not
-#     encroach on the selection view)
 #   x focus needs to be on the treeview initially
-#   * factoring out the code in PhotoRecordViewer.__init__()
-#      * need constants for the treeview columns
 #   * description label for information
-#   * tab order for art record editor
-#   * commiting a record -> update the status indicating it happend
 #   * default rubberband box is too big in art editor
-#   * rubberbands need to be slaved to their parents to be resized properly
-#   * region coordinates need to be normalized to dimensions
+#   * Windows with rubberbands need to have the appropriate widgets' sizes
+#     fixed so the regions are properly displayed (or rubberbands need to be
+#     slaved to their parents to be resized properly [HARD])
+#
+# Technical debt:
+#
+#   * factor out the code in PhotoRecordViewer.__init__()
+#      - need constants for the treeview columns
+#   * factor out the rubberband overlay setup code in refresh_art_record()
+#
+# Functionality:
+#
+#   ArtRecordEditor:
+#
+#     * Population of window with ArtRecord's contents
+#     * New record creation
+#     * Record deletion
+#     * Commiting a record needs to update the status indicating it happend
+#
+#   PhotoRecordEditor:
+#
+#     * Commiting a record needs to update the status indicating it happend
+#
+# Features:
+#
+#     * Indicator which region is associated with a given record (given it appears
+#       hard-coded on Linux)
+#
+# UI Nits:
+#
+#   * tab order for ArtRecordEditor.
+#   * sort the contents of the TreeView()'s
+#   * [IN PROGRESS] tree view columns need to be sized properly
+#   * relative sizing of stats box labels needs to be sized properly (and not
+#     encroach on the selection view).
 
 from functools import lru_cache, partial
 import time
