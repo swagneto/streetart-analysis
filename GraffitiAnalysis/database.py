@@ -508,6 +508,28 @@ class Database( object ):
 
         return [art for art in self.arts if art["photo_id"] in photo_ids]
 
+    def new_art_record( self, photo_id ):
+        """
+        Creates a new art record initialized with default values. XXX
+
+        Takes 1 argument:
+
+          photo_id - XXX
+
+        Returns 1 value:
+
+          art_record - XXX
+
+        """
+
+        # compute a unique index that hasn't been used yet.
+        art_id = max( [art["id"] for art in self.arts] ) + 1
+
+        # XXX: hardcoded constant
+        self.arts.append( ArtRecord( art_id, photo_id, "throwup" ) )
+
+        return self.arts[-1]
+
     def get_artists( self ):
         """
         Gets a list of artists known by the database.

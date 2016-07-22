@@ -956,6 +956,19 @@ class PhotoRecordEditor( RecordEditor ):
         """
         print( "Create a new art record for photo ID {:d}.".format( self.record["id"] ) )
 
+        # create a new record in the database and keep track of it within the
+        # editor.
+        new_art_record = self.db.new_art_record( self.record["id"] )
+        self.art_records.append( new_art_record )
+
+        # add the record into the model so we can see it.
+        self.artModel.insertRow( 0 )
+        self.artModel.setData( self.artModel.index( 0, 0 ), new_art_record["id"] )
+        self.artModel.setData( self.artModel.index( 0, 1 ), new_art_record["state"] )
+
+        # edit the record as a convenience.
+        self.edit_art_record( new_art_record["id"] )
+
     def delete_record( self ):
         """
         """
@@ -963,6 +976,43 @@ class PhotoRecordEditor( RecordEditor ):
         art_id = self.get_art_id_from_selection()
 
         print( "Deleting art record #{:d}.".format( art_id ) )
+
+    def edit_art_record( self, art_id ):
+        """
+        """
+
+        # if we're already editing this record, then focus that window instead
+        # of creating a new one.
+        if art_id in self.art_record_editors:
+            print( "Activating existing editor." )
+
+            # make the window we already created active and take focus.
+            #
+            # XXX: does this properly handle all cases where windows are
+            #      minimized or hidden?
+            #
+            self.art_record_editors[art_id].setWindowState( Qt.WindowActive )
+            return
+
+        for art in self.art_records:
+            if art["id"] == art_id:
+                print( "Editing art ID {:d}.".format( art_id ) )
+
+                # call our refresh method when this window commits changes to
+                # the record of interest...
+                commit_callback = partial( self.refresh_art_record, art_id )
+
+                # ... and cleanup our state when finished editing.
+                close_callback = partial( self.remove_art_editor, art_id )
+
+                self.art_record_editors[art_id] = ArtRecordEditor( self.db,
+                                                                   self.record["id"],
+                                                                   art,
+                                                                   self.preview_pixmap,
+                                                                   close_callback,
+                                                                   commit_callback )
+                self.art_record_editors[art_id].show()
+                break
 
     def remove_art_editor( self, art_id ):
 
@@ -975,6 +1025,18 @@ class PhotoRecordEditor( RecordEditor ):
         # XXX: factor this into a separate routine
         for art in self.art_records:
             if art["id"] == art_id:
+                # find this record in the model by it's art identifier (there
+                # can, and will, only be one) and update it's processing
+                # state.
+                index = self.artModel.match( self.artModel.index( 0, 0 ),
+                                             Qt.DisplayRole,
+                                             str( art_id ),
+                                             1,
+                                             Qt.MatchFixedString )[0]
+
+                self.artModel.setData( index.sibling( index.row(), 1 ), art["state"] )
+
+                # update this record's rubberband box.
                 if art["region"] is not None:
                     # remove an existing rubber band associated with this record if
                     # we have one.
@@ -1024,38 +1086,7 @@ class PhotoRecordEditor( RecordEditor ):
 
         art_id = self.get_art_id_from_selection()
 
-        # if we're already editing this record, then focus that window instead
-        # of creating a new one.
-        if art_id in self.art_record_editors:
-            print( "Activating existing editor." )
-
-            # make the window we already created active and take focus.
-            #
-            # XXX: does this properly handle all cases where windows are
-            #      minimized or hidden?
-            #
-            self.art_record_editors[art_id].setWindowState( Qt.WindowActive )
-            return
-
-        for art in self.art_records:
-            if art["id"] == art_id:
-                print( "Editing art ID {:d}.".format( art_id ) )
-
-                # call our refresh method when this window commits changes to
-                # the record of interest...
-                commit_callback = partial( self.refresh_art_record, art_id )
-
-                # ... and cleanup our state when finished editing.
-                close_callback = partial( self.remove_art_editor, art_id )
-
-                self.art_record_editors[art_id] = ArtRecordEditor( self.db,
-                                                                   self.record["id"],
-                                                                   art,
-                                                                   self.preview_pixmap,
-                                                                   close_callback,
-                                                                   commit_callback )
-                self.art_record_editors[art_id].show()
-                break
+        self.edit_art_record( art_id )
 
     def selectionTypeActivation( self ):
         """
