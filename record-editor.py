@@ -50,7 +50,8 @@
 from functools import lru_cache, partial
 import time
 
-from PyQt5.QtCore import Qt, QRect, QRegExp, QSize, QSortFilterProxyModel, QStringListModel
+from PyQt5.QtCore import ( Qt, QItemSelectionModel, QRect, QRegExp, QSize,
+                           QSortFilterProxyModel, QStringListModel )
 from PyQt5.QtGui import QImage, QPalette, QPixmap, QStandardItemModel
 from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
                               QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
@@ -1339,7 +1340,35 @@ class ArtRecordEditor( RecordEditor ):
         Returns nothing.
         """
 
-        # XXX: select things based on the contents of self.record
+        # XXX: better error checking for record types that aren't in the combo
+        #      box? validate it when pulling from the db.
+        self.artTypeComboBox.setCurrentIndex( self.artTypeComboBox.findText( self.record["type"] ) )
+        self.artSizeComboBox.setCurrentIndex( self.artSizeComboBox.findText( self.record["size"] ) )
+        self.artQualityComboBox.setCurrentIndex( self.artQualityComboBox.findText( self.record["quality"] ) )
+        self.artDateLineEdit.setText( "" if self.record["date"] is None else self.record["date"] )
+        self.artProcessingStateComboBox.setCurrentIndex( self.artProcessingStateComboBox.findText( self.record["state"] ) )
+
+        # ensure that we start with an empty selection view.
+        self.artArtistsListView.selectionModel().clear()
+        self.artAssociatesListView.selectionModel().clear()
+        self.artVandalsListView.selectionModel().clear()
+
+        # walk through the model backing each of our artist selections and
+        # select each one that is associated with the art.
+        #
+        # NOTE: each of the views uses the same model so we can iterate across
+        #       any one's contents.
+        #
+        for artist_index, artist in enumerate( self.artArtistsListView.model().stringList() ):
+            if artist in self.record["artists"]:
+                self.artArtistsListView.selectionModel().select( self.artArtistsListView.model().index( artist_index ),
+                                                                 QItemSelectionModel.Select )
+            if artist in self.record["associates"]:
+                self.artAssociatesListView.selectionModel().select( self.artAssociatesListView.model().index( artist_index ),
+                                                                    QItemSelectionModel.Select )
+            if artist in self.record["vandals"]:
+                self.artVandalsListView.selectionModel().select( self.artVandalsListView.model().index( artist_index ),
+                                                                 QItemSelectionModel.Select )
 
     def commit_record( self ):
         """
