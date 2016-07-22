@@ -252,7 +252,7 @@ class PhotoRecordViewer( RecordWindow ):
         # XXX: specify a callback to save the database.
         super().__init__( (800, 600), None )
 
-        self.setWindowTitle( "Photo Record Editor" )
+        self.setWindowTitle( "Photo Record Viewer" )
         self.show()
 
     def create_models( self ):
