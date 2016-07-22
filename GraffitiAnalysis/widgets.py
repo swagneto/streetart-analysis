@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt, QSize, QRectF
-from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap
 from PyQt5.QtWidgets import ( QHBoxLayout, QLabel, QRubberBand, QSizeGrip,
                               QWidget )
 
@@ -253,3 +253,190 @@ class RubberBandedPixmap( QLabel ):
 
         return QRectF( *normalized_position,
                        *normalized_size )
+
+class MultiRubberBandedPixmap( QLabel ):
+    """
+    Widget that displays an image as a QLabel that overlays zero or more
+    rubberband regions.  One of the rubberband regions can be designed as
+    selected which will cause its rendering to be highlighted relative to the
+    remaining regions.
+    """
+    # XXX: explore this handling resizeEvent()'s.
+
+    def __init__( self, filename, resolution=None, line_width=2, line_colors=None ):
+        """
+        Builds a MultiRubberBandedPixmap from the supplied filename.  The
+        initial size may also be specified, as can properties controlling the
+        rubberbanded region's visual appearance.
+
+        Takes 4 arguments:
+          filename    - Path to the image to display.
+          resolution  - Optional pair of positive integers specifying the
+                        initial size of the widget.  If omitted, defaults
+                        to (400, 300).
+          line_width  - Optional integer specifying the width of the
+                        rubberband outlines.  If omitted, defaults to 2
+                        pixels.
+          line_colors - Optional pair of QColors, one for the selected
+                        rubberband region and the other for the remaining.
+                        If omitted, suitable defaults are chosen.
+
+        Returns 1 value:
+
+          self - The newly created MultiRubberBandedPixmap object.
+
+        """
+
+        super().__init__()
+
+        # get our pixmap from the supplied object or from disk.
+        if isinstance( filename, QPixmap ):
+            self.loaded_pixmap = filename
+        else:
+            self.loaded_pixmap = QPixmap.fromImage( QImage( filename ) )
+
+        if resolution is None:
+            resolution = (400, 300)
+
+        if line_colors is None:
+            line_colors = (QColor( "#222222" ),
+                           QColor( "#aa2222" ))
+
+        # use a scaled version of the pixmap in question.
+        self.setPixmap( self.loaded_pixmap.scaled( *resolution, Qt.KeepAspectRatio ) )
+
+        # map from tag to bands we're rendering.  only one band can be
+        # selected at a time as specified by .selected_tag.
+        self.bands        = dict()
+        self.selected_tag = None
+
+        self.line_colors  = line_colors
+        self.line_width   = line_width
+
+    def add_band( self, tag, geometry ):
+        """
+        Adds a rubberband to the widget.  If the tag supplied corresponds to
+        an existing rubberband, the rubberband takes on the newly supplied
+        geometry.
+
+        This method causes the widget to be repainted.
+
+        Takes 2 values:
+
+          tag      - Tag associated with the added rubberband.  Must be
+                     hashable.
+          geometry - Geometry of the added rubberband, specified as
+                     (x, y, width, height) in normalized coordinates (in the
+                     range of [0, 1]).
+
+        Returns nothing.
+        """
+
+        # we do not need to worry about whether this replaced an existing band
+        # or not as we're redrawing everything anyway.
+        self.bands[tag] = geometry
+
+        self.repaint()
+
+    def remove_band( self, tag ):
+        """
+        Removes a rubberband from the widget.  If the rubberband specified by
+        the supplied tag is the selected region, no rubberband will be
+        selected after its removal.
+
+        Tags that do not correspond to a rubberband are silently ignored.
+
+        This method causes the widget to be repainted.
+
+        Takes 1 value:
+
+          tag - Tag whose rubberband should be removed.
+
+        Returns nothing.
+        """
+
+        # ignore requests for removing things we don't know about.
+        if not tag in self.bands:
+            return
+
+        self.bands.pop( tag, None )
+
+        # handle this band being the selected band.
+        if tag is self.selected_tag:
+            self.selected_tag = None
+
+        self.repaint()
+
+    def set_selection( self, tag ):
+        """
+        Sets the selected rubberband.  Selected rubberbands are highlighted to
+        indicate the selection status.
+
+        Tags that do not correspond to a rubberband are silently ignored.
+
+        This method causes the widget to be repainted.
+
+        Takes 1 value:
+
+          tag - Tag whose rubberband should be selected.
+
+        Returns nothing.
+
+        """
+
+        if tag in self.bands:
+            self.selected_tag = tag
+
+        self.repaint()
+
+    def paintEvent( self, event ):
+        """
+        Qt widget painting handler.
+
+        NOTE: This should not be invoked directly.
+
+        Takes 1 argument:
+
+          event - QPaintEvent object.
+
+        Returns nothing.
+
+        """
+
+        # repaint the pixmap before we begin drawing on it.
+        super().paintEvent( event )
+
+        # get our pixmap's current size so we can draw the bands correctly.
+        width, height = (self.pixmap().size().width(),
+                         self.pixmap().size().height())
+
+        qp = QPainter()
+
+        qp.begin( self )
+
+        # draw each band that we have, coloring the selected band differently.
+        for tag, normalized_geometry in self.bands.items():
+
+            # scale our normalized geometry so it is usable on this pixmap.
+            geometry = (normalized_geometry[0] * width,
+                        normalized_geometry[1] * height,
+                        normalized_geometry[2] * width,
+                        normalized_geometry[3] * height)
+
+            # create a dashed outline around our region.  the outline's color
+            # is determined by whether this is the selected band or not.
+            qp.setBrush( Qt.NoBrush )
+            pen = QPen( Qt.DashLine )
+            pen.setWidth( self.line_width )
+
+            if tag is self.selected_tag:
+                pen.setColor( self.line_colors[1] )
+            else:
+                pen.setColor( self.line_colors[0] )
+
+            qp.setPen( pen )
+
+            # do it.
+            qp.drawRect( *geometry )
+
+        qp.end()

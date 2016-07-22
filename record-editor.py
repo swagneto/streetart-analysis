@@ -17,7 +17,8 @@
 #      - need constants for the treeview columns
 #   * factor out the rubberband overlay setup code in refresh_art_record()
 #   * Pixmap passed from PhotoRecordViewer to PhotoRecordEditor needs to be
-#     the held reference rather than a new one.
+#     the held reference rather than a new one.  Update the widgets to take
+#     either a filename or an existing pixmap.
 #
 # Functionality:
 #
@@ -694,7 +695,6 @@ class PhotoRecordEditor( RecordEditor ):
 
         self.db          = db
         self.art_records = db.get_art_records( photo_record["id"] )
-        self.art_regions = dict()
 
         # map tracking the open photo editor windows.  each photo record can
         # only be edited by one window at a time.
@@ -745,36 +745,14 @@ class PhotoRecordEditor( RecordEditor ):
         Returns nothing.
         """
         #    photo preview.
-        self.photoPreview = QLabel()
-        self.photoPreview.setPixmap( self.preview_pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
+        self.photoPreview = grafwidgets.MultiRubberBandedPixmap( self.preview_pixmap,
+                                                                 resolution=(600, 450) )
 
         # draw the art record regions.
         # XXX: factor this into a separate routine
         for art in self.art_records:
             if art["region"] is not None:
-                # remove an existing rubber band associated with this record if
-                # we have one.
-                if art["id"] in self.art_regions:
-                    self.art_regions[art["id"]].hide()
-                    # XXX: do we need to delete this?
-
-                # pull our normalized geometry.  note that this is a tuple rather
-                # than a QRect()/QRectF() object.
-                normalized_geometry = art["region"]
-
-                pixmap_size = self.photoPreview.pixmap().size()
-
-                # map our normalized geometry to our pixmap's dimensions.
-                geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
-                                  round( normalized_geometry[1] * pixmap_size.height() ),
-                                  round( normalized_geometry[2] * pixmap_size.width() ),
-                                  round( normalized_geometry[3] * pixmap_size.height() ) )
-
-                rubber_band = QRubberBand( QRubberBand.Rectangle, self.photoPreview )
-                rubber_band.setGeometry( geometry )
-                rubber_band.show()
-
-                self.art_regions[art["id"]] = rubber_band
+                self.photoPreview.add_band( art["id"], art["region"] )
 
         #    processing type.
         self.selectionBox = QComboBox()
@@ -794,7 +772,7 @@ class PhotoRecordEditor( RecordEditor ):
         self.selectionView = QTreeView()
         self.selectionView.setModel( self.proxyArtModel )
         self.selectionView.activated.connect( self.selectionActivation )
-        self.selectionView.selectionModel().selectionChanged.connect( self.selectionChange )
+        self.selectionView.selectionModel().selectionChanged.connect( self.recordSelectionChange )
         self.selectionView.setEditTriggers( QAbstractItemView.NoEditTriggers )
         self.selectionView.setAlternatingRowColors( True )
         self.selectionView.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
@@ -1005,8 +983,7 @@ class PhotoRecordEditor( RecordEditor ):
         self.db.delete_art_record( art_id )
 
         # and remove the rubberband from our photo.
-        self.art_regions[art_id].hide()
-        self.art_regions.pop( art_id, None )
+        self.photoPreview.remove_band( art_id )
 
     def edit_art_record( self, art_id ):
         """
@@ -1069,29 +1046,7 @@ class PhotoRecordEditor( RecordEditor ):
 
                 # update this record's rubberband box.
                 if art["region"] is not None:
-                    # remove an existing rubber band associated with this record if
-                    # we have one.
-                    if art["id"] in self.art_regions:
-                        self.art_regions[art["id"]].hide()
-                        # XXX: do we need to delete this?
-
-                    # pull our normalized geometry.  note that this is a tuple rather
-                    # than a QRect()/QRectF() object.
-                    normalized_geometry = art["region"]
-
-                    pixmap_size = self.photoPreview.pixmap().size()
-
-                    # map our normalized geometry to our pixmap's dimensions.
-                    geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
-                                      round( normalized_geometry[1] * pixmap_size.height() ),
-                                      round( normalized_geometry[2] * pixmap_size.width() ),
-                                      round( normalized_geometry[3] * pixmap_size.height() ) )
-
-                    rubber_band = QRubberBand( QRubberBand.Rectangle, self.photoPreview )
-                    rubber_band.setGeometry( geometry )
-                    rubber_band.show()
-
-                    self.art_regions[art["id"]] = rubber_band
+                    self.photoPreview.add_band( art["id"], art["region"] )
 
                 print( "    Type:         {:s}\n"
                        "    Artists:      {:s}\n"
@@ -1107,6 +1062,19 @@ class PhotoRecordEditor( RecordEditor ):
                                                         art["state"],
                                                         art["region"] ) )
                 break
+
+    def recordSelectionChange( self, selected, deslected ):
+        """
+        """
+
+        # determine which, if any, item is now selected.  then redraw all of
+        # the regions.
+        if len( selected.indexes() ) == 0:
+            self.photoPreview.set_selection( None )
+        else:
+            self.photoPreview.set_selection( self.get_art_id_from_selection() )
+
+        self.photoPreview.repaint()
 
     def selectionActivation( self ):
         """
