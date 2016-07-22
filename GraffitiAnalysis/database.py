@@ -530,6 +530,14 @@ class Database( object ):
 
         return self.arts[-1]
 
+    def delete_art_record( self, art_id ):
+        """
+        XXX
+        """
+
+        # filter our the records that match the supplied identifier.
+        self.arts = [art for art in self.arts if art["id"] != art_id]
+
     def get_artists( self ):
         """
         Gets a list of artists known by the database.

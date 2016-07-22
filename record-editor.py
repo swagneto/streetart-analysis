@@ -975,7 +975,38 @@ class PhotoRecordEditor( RecordEditor ):
 
         art_id = self.get_art_id_from_selection()
 
-        print( "Deleting art record #{:d}.".format( art_id ) )
+        # if we're currently editing this record, then tell the user we're not
+        # doing anything until they close the window.
+        if art_id in self.art_record_editors:
+            print( "Art record #{:d} is being edited.  Cannot delete an actively edited record.".format( art_id ) )
+            return
+
+        confirmation_dialog = QMessageBox()
+        confirmation_dialog.setInformativeText( "Are you sure you want to remove art record #{:d}?".format( art_id ) )
+        confirmation_dialog.setStandardButtons( QMessageBox.Ok | QMessageBox.Cancel )
+        confirmation_dialog.setDefaultButton( QMessageBox.Cancel )
+        result = confirmation_dialog.exec_()
+
+        # nothing to do if we were told this was an accident.
+        if result == QMessageBox.Cancel:
+            return
+
+        # find this record in the model by it's art identifier (there
+        # can, and will, only be one) and update it's processing
+        # state.
+        index = self.artModel.match( self.artModel.index( 0, 0 ),
+                                     Qt.DisplayRole,
+                                     str( art_id ),
+                                     1,
+                                     Qt.MatchFixedString )[0]
+        self.artModel.removeRow( index.row() )
+
+        # remove the record from the database.
+        self.db.delete_art_record( art_id )
+
+        # and remove the rubberband from our photo.
+        self.art_regions[art_id].hide()
+        self.art_regions.pop( art_id, None )
 
     def edit_art_record( self, art_id ):
         """
