@@ -1050,7 +1050,7 @@ class PhotoRecordEditor( RecordEditor ):
                 self.art_record_editors[art_id] = ArtRecordEditor( self.db,
                                                                    self.record["id"],
                                                                    art,
-                                                                   self.photoPreview.pixmap(),
+                                                                   self.preview_pixmap,
                                                                    close_callback,
                                                                    commit_callback )
                 self.art_record_editors[art_id].show()
