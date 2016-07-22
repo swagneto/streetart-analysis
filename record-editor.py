@@ -280,6 +280,12 @@ class PhotoRecordViewer( RecordWindow ):
 
         # walk through each of the photo records and insert a new item at the
         # beginning of the model's list.
+        #
+        # XXX: there has got to be a better way to insert things.  the
+        #      QAbstractItemModel doesn't have an insert that grows.
+        #      inserting QStandardItems explicitly turns our id into an
+        #      empty string.  calling reversed() on the photos does not
+        #      actually do what we want.
         for photo in self.photos:
             self.photosModel.insertRow( 0 )
             self.photosModel.setData( self.photosModel.index( 0, 0 ), photo["id"] )
@@ -577,7 +583,7 @@ class PhotoRecordViewer( RecordWindow ):
             # make the window we already created active and take focus.
             #
             # XXX: does this properly handle all cases where windows are
-            #      minimized or hidden?
+            #      minimized or hidden? no it doesn't.
             #
             self.photo_record_editors[photo_id].setWindowState( Qt.WindowActive )
             return
