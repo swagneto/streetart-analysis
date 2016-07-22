@@ -165,7 +165,7 @@ class RubberBandedWidget( QWidget ):
         # resized.
         self.rubberband.resize( self.size() )
 
-class RubberBandedResizingPixmap( ResizingPixmap ):
+class RubberBandedPixmap( QLabel ):
     """
     Widget that displays an image as a QLabel that respects resizing and provides
     a rubberband region on it.
@@ -175,28 +175,32 @@ class RubberBandedResizingPixmap( ResizingPixmap ):
     #      it is transparent and responsed to single clicks to move the banded
     #      region around.
 
-    def __init__( self, filename, resolution=None, minimum_resolution=None ):
+    def __init__( self, filename, resolution=None ):
         """
-        Builds a RubberBandedResizingPixmap from the supplied filename.  The
+        Builds a RubberBandedPixmap from the supplied filename.  The
         initial size and minimum size may also be set.
 
-        Takes 3 arguments:
+        Takes 4 arguments:
 
-          filename           - Path to the image to display.
-          resolution         - Optional pair of positive integers specifying
-                               the initial size of the widget.  If omitted,
-                               defaults to (400, 300).
-          minimum_resolution - Optional pair of positive integers specifying
-                               the smallest size of the widget.  If omitted,
-                               defaults to (1, 1).
+          filename   - Path to the image to display.
+          resolution - Optional pair of positive integers specifying
+                       the initial size of the widget.  If omitted,
+                       defaults to (400, 300).
 
         Returns 1 value:
 
           self - The newly created RubberBandedResizingPixmap object.
         """
 
-        # initialize our superclass so we get a resizable pixmap.
-        super().__init__( filename, resolution, minimum_resolution )
+        super().__init__()
+
+        if resolution is None:
+            resolution = (400, 300)
+
+        # note that we store the pixmap so that resized versions can be
+        # created whenever our widget is resized.
+        self.loaded_pixmap = QPixmap.fromImage( QImage( filename ) )
+        self.setPixmap( self.loaded_pixmap.scaled( *resolution, Qt.KeepAspectRatio ) )
 
         # add a banded region to ourselves.  track it so we can move it around
         # programmatically.

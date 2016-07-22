@@ -1203,7 +1203,8 @@ class ArtRecordEditor( RecordEditor ):
         """
 
         # create a preview of this record's photo.
-        self.photoPreview = grafwidgets.RubberBandedResizingPixmap( self.photo_record["filename"] )
+        self.photoPreview = grafwidgets.RubberBandedPixmap( self.photo_record["filename"],
+                                                            (600, 450) )
         self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
 
         # overlay the interactive rubberband box to se
