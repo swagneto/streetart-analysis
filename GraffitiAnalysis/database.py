@@ -247,7 +247,7 @@ class ArtRecord( Record ):
             created_time = time.mktime( time.gmtime() )
 
         if modified_time is None:
-            modified_time = creation_time
+            modified_time = created_time
 
         _readable_keys = ["artists", "associates", "created_time", "date",
                           "id", "modified_time", "photo_id", "quality",
