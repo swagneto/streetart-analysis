@@ -1026,7 +1026,31 @@ class Database( object ):
 
         self.filename = filename
 
+        # flag indicating whether we have data that needs to be written to the
+        # backing store.
+        self.modified_data = False
+
         self.load_database()
+
+    def mark_data_dirty( self ):
+        """
+        Sets an internal flag indicating that the database has changed and
+        needs to be saved, lest said changes be lost.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        self.modified_data = True
+
+    def are_data_dirty( self ):
+        """
+        Predicate indicating whether the database has dirty data and needs to
+        be saved to avoid losing changes.
+        """
+
+        return self.modified_data
 
     def load_database( self ):
         """
@@ -1062,9 +1086,6 @@ class Database( object ):
         Returns nothing.
         """
 
-        # XXX: hack to prevent corruption of our test DB during development.
-        filename = None
-
         if filename is None:
             if self.filename is None:
                 filename = "memory"
@@ -1080,6 +1101,9 @@ class Database( object ):
                                  self.processing_states,
                                  self.photos,
                                  self.arts )
+
+        # mark our data as clean again.
+        self.modified_data = False
 
     def get_photo_records( self, photo_ids=None ):
         """
@@ -1172,12 +1196,16 @@ class Database( object ):
         # XXX: hardcoded constant
         self.arts.append( ArtRecord( art_id, photo_id, "throwup" ) )
 
+        self.mark_data_dirty()
+
         return self.arts[-1]
 
     def delete_art_record( self, art_id ):
         """
         XXX
         """
+
+        self.mark_data_dirty()
 
         # filter our the records that match the supplied identifier.
         self.arts = [art for art in self.arts if art["id"] != art_id]
