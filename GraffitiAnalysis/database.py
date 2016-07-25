@@ -722,7 +722,7 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
     # serialize our DOM into a string and write it to disk.
     xml_string = etree.tostring( root_node, pretty_print=True )
 
-    with open( filename + ".test", "wb" ) as f:
+    with open( filename, "wb" ) as f:
         f.write( xml_string )
 
 class Record( object ):
