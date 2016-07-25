@@ -1,10 +1,11 @@
+import collections
 import time
+
+from lxml import etree
 
 def _read_xml_database( filename ):
     """
     Reads the database from the specified XML file.
-
-    NOTE: This is currently not implemented.
 
     Takes 1 argument:
 
@@ -24,7 +25,421 @@ def _read_xml_database( filename ):
 
     """
 
-    return (None, None, None, None)
+    def parse_simple_node_list( node, node_name, attribute_name ):
+        """
+        Parses a list of nodes from a parent node.  Each node in the list is
+        expected to have the same element name and the value to parse is
+        in the specified attribute.  The values are returned as a list with
+        the same order as encountered.
+
+        If an unexpected child node is encountered, a RuntimeError is raised
+        indicating the node found.
+
+        Takes 3 argument:
+
+          node           - Element whose children nodes are to be parsed.
+          node_name      - Name of the children nodes to parse.  Any child node
+                           with a differing name will raise an exception.
+          attribute_name - Name of the children nodes' attribute to parse for
+                           values.
+
+        Returns 1 value:
+
+           values - List of value strings parsed from the children nodes.
+
+        """
+
+        values = []
+
+        for child_index, child_node in enumerate( node ):
+            if child_node.tag != node_name:
+                raise RuntimeError( "Expected '{:s}' but got '{:s}' instead for child #{:d}.".format( node_name,
+                                                                                                      child_node.tag,
+                                                                                                      child_index ) )
+
+            values.append( child_node.get( attribute_name ) )
+
+        return values
+
+    def parse_art_fields_node( art_fields_node ):
+        """
+        Parses the art fields from the supplied node.  Returns a dictionary
+        with the following keys:
+
+          types     - List of art types.
+          sizes     - List of art sizes.
+          qualities - List of art qualities.
+
+        No validation is performed on the values parsed.
+
+        Takes 1 argument:
+
+          art_fields_node - Element whose children contain art field nodes to
+                            parse.
+
+        Returns 1 value:
+
+          art_fields - Dictionary whose values are lists of the values parsed.
+                       See above for a list of keys.
+        """
+
+        if len( art_fields_node ) != 3:
+            raise RuntimeError( "Expected 3 children, received {:d}.".format( len( art_fields_node ) ) )
+
+        # parse each of our children nodes as simple lists.
+        if art_fields_node[0].tag != "Types":
+            raise RuntimeError( "Expected the 1st child to be 'Types', received '{:s}'.".format( art_fields_node[0].tag ) )
+        types = parse_simple_node_list( art_fields_node[0], "Type", "name" )
+
+        if art_fields_node[1].tag != "Sizes":
+            raise RuntimeError( "Expected the 2nd child to be 'Sizes', received '{:s}'.".format( art_fields_node[1].tag ) )
+        sizes     = parse_simple_node_list( art_fields_node[1], "Size", "name" )
+
+        if art_fields_node[2].tag != "Qualities":
+            raise RuntimeError( "Expected the 3rd child to be 'Qualities', received '{:s}'.".format( art_fields_node[2].tag ) )
+        qualities = parse_simple_node_list( art_fields_node[2], "Quality", "name" )
+
+        return { "types":     types,
+                 "sizes":     sizes,
+                 "qualities": qualities }
+
+    def parse_processing_states_node( processing_states_node ):
+        """
+        Parses the processing states from the supplied node.  Returns a list
+        of values.  No validation is performed on the values parsed.
+
+        Takes 1 argument:
+
+          processing_states_node - Element whose children nodes contain the
+                                   processing states to parse.
+
+        Returns 1 value:
+
+          processing_states - List of processing states parsed.
+
+        """
+
+        return parse_simple_node_list( processing_states_node, "State", "name" )
+
+    def parse_artists_node( artists_node ):
+        """
+        Parses the artists from the supplied node.  Returns a list of values.
+        No validation is performed on the values parsed.
+
+        Takes 1 argument:
+
+          artists_node - Element whose children nodes contain the artists to
+                         parse.
+
+        Returns 1 value:
+
+          artists - List of artists parsed.
+
+        """
+
+        return parse_simple_node_list( artists_node, "Artist", "name" )
+
+    def parse_fields_node( fields_node ):
+        """
+        Parses the databases fields from the supplied node.  Returns a
+        dictionary for the art fields and a list of artists.  The dictionary's
+        keys are:
+
+          types     - List of art types.
+          sizes     - List of art sizes.
+          qualities - List of art qualities.
+
+        No validation is performed on the values parsed.
+
+        Takes 1 argument:
+
+          fields_node - Element whose children nodes contain the art fields,
+                        processing states, and artists to parse.
+
+        Returns 2 values:
+
+          art_fields        - Dictionary whose values are lists of the values
+                              parsed.  See above for a list of keys.
+          processing_states - List of processing states.
+
+        """
+
+        if len( fields_node ) != 3:
+            raise RuntimeError( "parse_fields_node(): Expected 3 nodes but got {:d}.".format( len( fields_node ) ) )
+
+        if fields_node[0].tag != "ArtFields":
+            raise RuntimeError( "" )
+        art_fields = parse_art_fields_node( fields_node[0] )
+
+        if fields_node[1].tag != "ProcessingStates":
+            raise RuntimeError( "" )
+        processing_states = parse_processing_states_node( fields_node[1] )
+
+        if fields_node[2].tag != "Artists":
+            raise RuntimeError( "" )
+        artists = parse_artists_node( fields_node[2] )
+
+        return ({ "types":     art_fields["types"],
+                  "sizes":     art_fields["sizes"],
+                  "qualities": art_fields["qualities"],
+                  "artists":   artists },
+                 processing_states )
+
+    def parse_photos_node( photos_node ):
+        """
+        Parses a Photos node into a list of PhotoRecord objects.  No
+        validation is performed on the values parsed.
+
+        Takes 1 argument:
+
+          photos_node - Element whose children represent the database's photo
+                        records.
+
+        Returns 1 value:
+
+          photos - List of PhotoRecord objects parsed.
+
+        """
+
+        photos = []
+
+        for photo_index, photo_node in enumerate( photos_node ):
+            if photo_node.tag != "Photo":
+                raise RuntimeError( "Expected a Photo node but got {:s} [#{:d}].".format( photo_node.tag,
+                                                                                          photo_index ) )
+
+            # get a proper dictionary of this node's attributes.
+            attributes    = photo_node.attrib
+
+            # these are our mandatory arguments for building a PhotoRecord...
+            id            = int( attributes.pop( "id", None ) )
+            filename      = attributes.pop( "filename", None )
+            resolution    = attributes.pop( "resolution", None )
+
+            # ... and these are the optional ones.
+            state         = attributes.pop( "processing_state", None )  # name change.
+            created_time  = float( attributes.pop( "created_time", None ) )
+            modified_time = float( attributes.pop( "modified_time", None ) )
+            location      = attributes.pop( "location", None )
+            rotation      = int( attributes.pop( "rotation", None ) )
+
+            # handle conversion between our XML and internal Python
+            # representations.  resolutions are specified as "NxM" and
+            # locations as "X, Y".
+            resolution = [size for size in map( int, resolution.split( "x" ) )]
+            location   = [where for where in map( float, location.split( "," ) )]
+
+            #
+            # NOTE: all of the remaining attributes are fine to be passed as is.
+            #
+            photos.append( PhotoRecord( id,
+                                        filename,
+                                        resolution,
+                                        created_time=created_time,
+                                        modified_time=modified_time,
+                                        location=location,
+                                        rotation=rotation,
+                                        **attributes ) )
+
+        return photos
+
+    def parse_arts_node( arts_node ):
+        """
+        Parses a Arts node into a list of ArtRecord objects.  No validation is
+        performed on the values parsed.
+
+        Takes 1 argument:
+
+          art_node - Element whose children represent the database's art
+                     records.
+
+        Returns 1 value:
+
+          art - List of ArtRecord objects parsed.
+
+        """
+
+        art = []
+
+        for art_index, art_node in enumerate( arts_node ):
+            if art_node.tag != "Art":
+                raise RuntimeError( "Expected a Art node but got {:s} [#{:d}].".format( art_node.tag,
+                                                                                        art_index ) )
+
+            # get a proper dictionary of this node's attributes.
+            attributes    = art_node.attrib
+
+            # these are our mandatory arguments for building a ArtRecord...
+            id            = int( attributes.pop( "id", None ) )
+            photo_id      = int( attributes.pop( "photo_id", None ) )
+            art_type      = attributes.pop( "type", None )
+
+            # ... and these are the optional ones.
+            state         = attributes.pop( "processing_state", None )  # name change.
+            artists       = attributes.pop( "artists", None )
+            associates    = attributes.pop( "associates", None )
+            vandals       = attributes.pop( "vandals", None )
+            created_time  = float( attributes.pop( "created_time", None ) )
+            modified_time = float( attributes.pop( "modified_time", None ) )
+            region        = attributes.pop( "region", None )
+
+            # handle conversion between our XML and internal Python
+            # representations.  artists, associates, and vandals are all comma
+            # delineated lists.  region is a comma delimited 4-tuple of
+            # normalized floats.
+            artists    = artists.split( "," )
+            associates = associates.split( "," )
+            vandals    = vandals.split( "," )
+
+            if region is not None:
+                region = tuple( [value for value in map( float, region.split( "," ))] )
+
+            art.append( ArtRecord( id,
+                                   photo_id,
+                                   art_type,
+                                   artists=artists,
+                                   associates=associates,
+                                   vandals=vandals,
+                                   state=state,
+                                   region=region,
+                                   created_time=created_time,
+                                   modified_time=modified_time,
+                                   **attributes ) )
+
+        return art
+
+    def validate_art_fields( art_fields, processing_states ):
+        """
+        Validates the art fields and processing states to ensure that they are
+        suitable for processing.  Ensures that there is at least one value
+        for each field and that there aren't duplicates within a field.
+
+        If the supplied arguments are invalid a RuntimeError describing the
+        validation error is raised.
+
+        Takes 2 arguments:
+
+          art_fields        - Dictionary (from parse_fields_node()) to validate.
+          processing_states - List of processing states to validate.
+
+        Returns nothing.
+
+        """
+
+        # validate that we did not have any duplicate fields in what we read.
+        duplicate_art_types         = [item for item, count in collections.Counter( fields[0]["types"] ).items() if count > 1]
+        duplicate_art_sizes         = [item for item, count in collections.Counter( fields[0]["sizes"] ).items() if count > 1]
+        duplicate_art_qualities     = [item for item, count in collections.Counter( fields[0]["qualities"] ).items() if count > 1]
+        duplicate_artists           = [item for item, count in collections.Counter( fields[0]["artists"] ).items() if count > 1]
+        duplicate_processing_states = [item for item, count in collections.Counter( fields[1] ).items() if count > 1]
+
+        if len( duplicate_art_types ) > 0:
+            raise RuntimeError( "Duplicate art types: {:s}".format( ", ".join( duplicate_art_types ) ) )
+        elif len( fields[0]["types"] ) == 0:
+            raise RuntimeError( "No art types were parsed." )
+
+        if len( duplicate_art_sizes ) > 0:
+            raise RuntimeError( "Duplicate art sizes: {:s}".format( ", ".join( duplicate_art_sizes ) ) )
+        elif len( fields[0]["sizes"] ) == 0:
+            raise RuntimeError( "No art sizes were parsed." )
+
+        if len( duplicate_art_qualities ) > 0:
+            raise RuntimeError( "Duplicate art qualities: {:s}".format( ", ".join( duplicate_art_qualities ) ) )
+        elif len( fields[0]["qualities"] ) == 0:
+            raise RuntimeError( "No art qualities were parsed." )
+
+        if len( duplicate_artists ) > 0:
+            raise RuntimeError( "Duplicate artists: {:s}".format( ", ".join( duplicate_artists ) ) )
+        elif len( fields[0]["artists"] ) == 0:
+            raise RuntimeError( "No artists were parsed." )
+
+        if len( duplicate_processing_states ) > 0:
+            raise RuntimeError( "Duplicate aprocessing states: {:s}".format( ", ".join( duplicate_processing_states ) ) )
+        elif len( duplicate_processing_states ) == 0:
+            raise RuntimeError( "No processing states were parsed." )
+
+    def validate_identifiers( photos, art ):
+        """
+        Validates the photo and art records to ensure that they are suitable
+        for processing.  Ensures that every record's identifier is unique
+        within its class, and that every art record has a parent photo record.
+
+        If the supplied arguments are invalid a RuntimeError describing the
+        validation error is raised.
+
+        Takes 2 arguments:
+
+          photos - List of PhotoRecord objects to validate.
+          art    - List of ArtRecord objects to validate.
+
+        Returns nothing.
+
+        """
+
+        # validate that we did not have any duplicates in our photo record
+        # identifiers.
+        photo_ids = dict()
+        for photo in photos:
+            if photo["id"] in photo_ids:
+                photo_ids[photo["id"]] += 1
+            else:
+                photo_ids[photo["id"]] = 1
+
+        duplicate_photo_ids = [photo_id for photo_id, count in photo_ids.items() if count > 1]
+
+        # validate that we don't have duplicate art record identifiers, as well as
+        # seeing if we have any orphaned art records (read: no parent photo
+        # record).
+        art_ids          = dict()
+        orphaned_art_ids = []
+        for record in art:
+            if record["id"] in art_ids:
+                art_ids[record["id"]] += 1
+            else:
+                art_ids[record["id"]] = 1
+
+            if record["photo_id"] not in photo_ids:
+                orphaned_art_ids.append( record["id"] )
+
+        duplicate_art_ids = [art_id for art_id, count in art_ids.items() if count > 1]
+
+        if len( duplicate_photo_ids ) > 0:
+            raise RuntimeError( "Duplicate photo ID: {:s}.".format( ", ".join( map( str, duplicate_photo_ids ) ) ) )
+
+        if len( duplicate_art_ids ) > 0:
+            raise RuntimeError( "Duplicate art ID: {:s}.".format( ", ".join( map( str, duplicate_art_ids ) ) ) )
+
+        if len( orphaned_art_ids ) > 0:
+            raise RuntimeError( "Orphaned art records: {:s}.".format( ", ".join( map( str, orphaned_art_ids ) ) ) )
+
+    # read the XML file as a giant string and then convert its DOM into
+    # something we can work with.
+    with open( filename, "rt" ) as xml_file:
+        xml_string = xml_file.read()
+    root_node = etree.fromstring( xml_string )
+
+    if len( root_node ) != 3:
+        raise RuntimeError( "Expected 3 elements within the document, but received {:d}.".format( len( root_node ) ) )
+
+    # parse the fields, and our photos and art records.
+    if root_node[0].tag != "Fields":
+        raise RuntimeError( "" )
+    fields = parse_fields_node( root_node[0] )
+
+    if root_node[1].tag != "Photos":
+        raise RuntimeError( "" )
+    photos = parse_photos_node( root_node[1] )
+
+    if root_node[2].tag != "Arts":
+        raise RuntimeError( "" )
+    art = parse_arts_node( root_node[2] )
+
+    # validate what we received so we don't pass garbage back to the user.
+    validate_art_fields( fields[0], fields[1] )
+    validate_identifiers( photos, art )
+
+    # XXX: rework the interface here
+    return (fields[0], fields[1], photos, art)
 
 def _read_memory_database( ):
     """
@@ -411,7 +826,7 @@ class Database( object ):
             read_func = _read_xml_database
 
         # load the database.
-        self.art_fields, self.processing_states, self.photos, self.arts = read_func()
+        self.art_fields, self.processing_states, self.photos, self.arts = read_func( filename )
 
     def save_database( self, filename=None ):
         """
@@ -435,7 +850,12 @@ class Database( object ):
             else:
                 filename = self.filename
 
-        print( "XXX: Writing out database to {:s}.".format( filename ) )
+        if filename == "memory":
+            print( "XXX: Writing out database to {:s}.".format( filename ) )
+
+            return 0
+        else:
+            return _write_xml_database( filename )
 
     def get_photo_records( self, photo_ids=None ):
         """
