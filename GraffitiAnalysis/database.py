@@ -285,11 +285,11 @@ def _read_xml_database( filename ):
 
             # handle conversion between our XML and internal Python
             # representations.  artists, associates, and vandals are all comma
-            # delineated lists.  region is a comma delimited 4-tuple of
+            # delimited lists.  region is a comma delimited 4-tuple of
             # normalized floats.
-            artists    = artists.split( "," )
-            associates = associates.split( "," )
-            vandals    = vandals.split( "," )
+            artists    = [string for string in map( lambda x: x.strip(), artists.split( "," ) )]
+            associates = [string for string in map( lambda x: x.strip(), associates.split( "," ) )]
+            vandals    = [string for string in map( lambda x: x.strip(), vandals.split( "," ) )]
 
             if region is not None:
                 region = tuple( [value for value in map( float, region.split( "," ))] )
