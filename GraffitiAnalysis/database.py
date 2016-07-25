@@ -222,12 +222,15 @@ def _read_xml_database( filename ):
             modified_time = float( attributes.pop( "modified_time", None ) )
             location      = attributes.pop( "location", None )
             rotation      = int( attributes.pop( "rotation", None ) )
+            tags          = attributes.pop( "tags", None )
 
             # handle conversion between our XML and internal Python
             # representations.  resolutions are specified as "NxM" and
-            # locations as "X, Y".
+            # locations as "X, Y".  tags is a comma delimited list of
+            # strings.
             resolution = [size for size in map( int, resolution.split( "x" ) )]
             location   = [where for where in map( float, location.split( "," ) )]
+            tags       = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
 
             #
             # NOTE: all of the remaining attributes are fine to be passed as is.
@@ -236,9 +239,11 @@ def _read_xml_database( filename ):
                                         filename,
                                         resolution,
                                         created_time=created_time,
-                                        modified_time=modified_time,
                                         location=location,
+                                        modified_time=modified_time,
                                         rotation=rotation,
+                                        state=state,
+                                        tags=tags,
                                         **attributes ) )
 
         return photos
@@ -299,11 +304,11 @@ def _read_xml_database( filename ):
                                    art_type,
                                    artists=artists,
                                    associates=associates,
-                                   vandals=vandals,
-                                   state=state,
-                                   region=region,
                                    created_time=created_time,
                                    modified_time=modified_time,
+                                   region=region,
+                                   state=state,
+                                   vandals=vandals,
                                    **attributes ) )
 
         return art
