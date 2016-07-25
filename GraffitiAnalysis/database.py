@@ -355,7 +355,7 @@ def _read_xml_database( filename ):
 
         if len( duplicate_processing_states ) > 0:
             raise RuntimeError( "Duplicate aprocessing states: {:s}".format( ", ".join( duplicate_processing_states ) ) )
-        elif len( duplicate_processing_states ) == 0:
+        elif len( fields[1] ) == 0:
             raise RuntimeError( "No processing states were parsed." )
 
     def validate_identifiers( photos, art ):
