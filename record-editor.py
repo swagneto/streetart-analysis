@@ -1110,8 +1110,15 @@ class PhotoRecordEditor( RecordEditor ):
         # the regions.
         if len( selected.indexes() ) == 0:
             self.photoPreview.set_selection( None )
+
+            # nothing is selected, so we can't delete anything.
+            self.deleteRecordButton.setEnabled( False )
         else:
             self.photoPreview.set_selection( self.get_art_id_from_selection() )
+
+            # now that something is selected, we have the opportunity to
+            # delete it.
+            self.deleteRecordButton.setEnabled( True )
 
         self.photoPreview.repaint()
 
@@ -1144,28 +1151,6 @@ class PhotoRecordEditor( RecordEditor ):
             self.proxyArtModel.setFilterRegExp( regexp )
 
         print( selection_type )
-
-    def selectionChange( self, selected, deselected ):
-        """
-        """
-
-        # we're not interested in deselection events.  these occur when the
-        # user control clicks a selected entry and when the the proxy model
-        # filters out the previously visible selection.
-        print( "Handle the deselection case properly when we have art record regions" )
-
-        if len( selected.indexes() ) == 0:
-            # nothing is selected, so we can't delete anything.
-            self.deleteRecordButton.setEnabled( False )
-            return
-        else:
-            self.deleteRecordButton.setEnabled( True )
-
-        art_id = self.get_art_id_from_selection()
-
-        print( "Preview art record #{:d}.".format( art_id ) )
-
-        #self.preview_photo_record( photo_id )
 
     def closeEvent( self, event ):
         """
