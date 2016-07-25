@@ -509,6 +509,222 @@ def _read_memory_database( ):
             photos,
             art)
 
+def _write_xml_database( filename, art_fields, processing_states, photos, arts ):
+    """
+    Writes an XML representation of the database to the specified file name.
+    The supplied database fields and records are validated and then converted
+    to DOM before serializing it the file.
+
+    If an error occurs during write, a RuntimeError is raised.
+
+    Takes 5 arguments:
+
+      filename          - File name to write the serialized XML to.  If the
+                          file already exists, it will be overwritten.
+      art_fields        - Dictionary containing various database field values
+                          associated with the art records.  Each key's value
+                          is a list of strings.
+      processing_states - List of values representing the states records may be
+                          in.
+      photos            - A list of PhotoRecord objects, one per record in the
+                          database.
+      arts              - A list of ArtRecord objects, one per record in the
+                          database.
+
+    Returns nothing.
+
+    """
+
+    def create_simple_list_node( values, parent_name, child_name, attribute_name ):
+        """
+        Constructs an Element node containing a list of children corresponding
+        to the list of values provided.  Each child Element node has the same
+        tag name and stores its associated value in the specified attribute.
+
+        No validation is done to the values supplied.
+
+        Takes 4 arguments:
+
+          values         - List of values to store in the generated DOM.  Each
+                           value will be converted to a string.
+          parent_name    - Name of the Element node created.
+          child_name     - Name of the children Element nodes beneath parent_name.
+          attribute_name - Name of the childrens' attribute storing each of the
+                           supplied values.
+
+        Returns 1 value:
+
+          parent_node - The constructed Element node.
+
+        """
+
+        parent_node = etree.Element( parent_name )
+
+        for value in values:
+            node                        = etree.Element( child_name )
+            node.attrib[attribute_name] = str( value )
+
+            parent_node.append( node )
+
+        return parent_node
+
+    def create_art_fields_node( art_types, art_sizes, art_qualities ):
+        """
+        Constructs an Element node containing art fields nodes constructed
+        from the supplied lists.  Art types, sizes, and qualities are all
+        converted into simple node lists.
+
+        No validation is done for any of the supplied values.
+
+        Takes 3 arguments:
+
+          art_types     - List of art types.
+          art_sizes     - List of art sizes.
+          art_qualities - List of art qualities.
+
+        Returns 1 value:
+
+          art_fields_node - The constructed Element node.
+
+        """
+
+        art_fields_node = etree.Element( "ArtFields" )
+
+        art_fields_node.append( create_simple_list_node( art_types, "Types", "Type", "name" ) )
+        art_fields_node.append( create_simple_list_node( art_types, "Sizes", "Size", "name" ) )
+        art_fields_node.append( create_simple_list_node( art_types, "Qualities", "Quality", "name" ) )
+
+        return art_fields_node
+
+    def create_fields_node( art_fields, processing_states ):
+        """
+        Constructs an Element node containing the art fields node, the
+        processing states node, and the artists node from the supplied
+        parameters.  The supplied art_fields dictionary must have the
+        following keys:
+
+          types     - List of art types.
+          sizes     - List of art sizes.
+          qualities - List of art qualities.
+          artists   - List of artists.
+
+        No validation is done for any of the supplied values.
+
+        Takes 2 arguments:
+
+          art_fields        - Dictionary containing lists of values to
+                              encode.  The required keys are listed above.
+          processing_states - List of processing states.
+
+        Returns 1 value:
+
+          fields_node - The constructed Element node.
+
+        """
+
+        fields_node = etree.Element( "Fields" )
+
+        fields_node.append( create_art_fields_node( art_fields["types"],
+                                                    art_fields["sizes"],
+                                                    art_fields["qualities"] ) )
+        fields_node.append( create_simple_list_node( processing_states, "ProcessingStates", "State", "name" ) )
+        fields_node.append( create_simple_list_node( art_fields["artists"], "Artists", "Artist", "name" ) )
+
+        return fields_node
+
+    def create_photos_node( photos ):
+        """
+        Constructs an Element containing all of the specified PhotoRecords
+        converted into children Element nodes.
+
+        No validation is done for any of the supplied values.
+
+        Takes 1 argument:
+
+          photos - List of PhotoRecords to convert into Element nodes.
+
+        Returns 1 value:
+
+          photos_node - The constructed Element node.
+
+        """
+
+        photos_node = etree.Element( "Photos" )
+
+        for photo in photos:
+            photo_node = etree.Element( "Photo" )
+
+            photo_node.attrib["created_time"]     = str( photo["created_time"] )
+            photo_node.attrib["filename"]         = photo["filename"]
+            photo_node.attrib["id"]               = str( photo["id"] )
+            photo_node.attrib["location"]         = ", ".join( map( str, photo["location"] ) )
+            photo_node.attrib["modified_time"]    = str( photo["modified_time"] )
+            photo_node.attrib["processing_state"] = photo["state"]
+            photo_node.attrib["resolution"]       = "x".join( map( str, photo["resolution"] ) )
+            photo_node.attrib["rotation"]         = str( photo["rotation"] )
+            photo_node.attrib["tags"]             = ", ".join( photo["tags"] )
+
+            photos_node.append( photo_node )
+
+        return photos_node
+
+    def create_arts_node( arts ):
+        """
+        Constructs an Element containing all of the specified ArtRecords
+        converted into children Element nodes.
+
+        No validation is done for any of the supplied values.
+
+        Takes 1 argument:
+
+          arts - List of ArtRecords to convert into Element nodes.
+
+        Returns 1 value:
+
+          arts_node - The constructed Element node.
+
+        """
+
+        arts_node = etree.Element( "Arts" )
+
+        for art in arts:
+            art_node = etree.Element( "Art" )
+
+            art_node.attrib["artists"]          = ", ".join( art["artists"] )
+            art_node.attrib["associates"]       = ", ".join( art["associates"] )
+            art_node.attrib["created_time"]     = str( art["created_time"] )
+            art_node.attrib["id"]               = str( art["id"] )
+            art_node.attrib["modified_time"]    = str( art["modified_time"] )
+            art_node.attrib["photo_id"]         = str( art["photo_id"] )
+            art_node.attrib["processing_state"] = art["state"]
+            art_node.attrib["quality"]          = art["quality"]
+            art_node.attrib["region"]           = ", ".join( map( str, art["region"] ) )
+            art_node.attrib["size"]             = art["size"]
+            art_node.attrib["type"]             = art["type"]
+            art_node.attrib["vandals"]          = ", ".join( art["vandals"] )
+
+            arts_node.append( art_node )
+
+        return arts_node
+
+    # create our root element.
+    root_node = etree.Element( "StreetArtDB" )
+
+    # XXX: validate everything is internally kosher (have to figure out how to
+    #      factor the reading routines' validation)
+
+    # add in each of our children nodes describing the field values and
+    # records.
+    root_node.append( create_fields_node( art_fields, processing_states ) )
+    root_node.append( create_photos_node( photos ) )
+    root_node.append( create_arts_node( arts ) )
+
+    # serialize our DOM into a string and write it to disk.
+    xml_string = etree.tostring( root_node, pretty_print=True )
+
+    with open( filename + ".test", "wb" ) as f:
+        f.write( xml_string )
+
 class Record( object ):
     """
     Provides a dictionary-like interface with a fixed set of keys, some
@@ -858,9 +1074,12 @@ class Database( object ):
         if filename == "memory":
             print( "XXX: Writing out database to {:s}.".format( filename ) )
 
-            return 0
         else:
-            return _write_xml_database( filename )
+            _write_xml_database( filename,
+                                 self.art_fields,
+                                 self.processing_states,
+                                 self.photos,
+                                 self.arts )
 
     def get_photo_records( self, photo_ids=None ):
         """
