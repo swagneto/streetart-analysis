@@ -244,7 +244,7 @@ class PhotoRecordViewer( RecordWindow ):
         """
 
         # set the state for the window.
-        self.db     = grafdb.Database( None )
+        self.db     = grafdb.Database( "database.xml" )
         self.photos = self.db.get_photo_records()
 
         # map keeping track of the open photo editor windows.  each photo
@@ -480,6 +480,8 @@ class PhotoRecordViewer( RecordWindow ):
         Returns nothing.
         """
 
+        self.saveAct = QAction( "&Save", self, shortcut="Ctrl+S",
+                                triggered=self.save_database )
         self.exitAct = QAction( "E&xit", self, shortcut="Ctrl+Q",
                                 triggered=self.close )
 
@@ -489,6 +491,7 @@ class PhotoRecordViewer( RecordWindow ):
                                    triggered=QApplication.instance().aboutQt )
 
         self.fileMenu = QMenu( "&File", self )
+        self.fileMenu.addAction( self.saveAct )
         self.fileMenu.addAction( self.exitAct )
 
         self.helpMenu = QMenu( "&Help", self )
@@ -516,6 +519,13 @@ class PhotoRecordViewer( RecordWindow ):
         #       select the first visible column instead.
         #
         self.selectionView.setCurrentIndex( self.proxyPhotosModel.index( 0, 1 ) )
+
+    def save_database( self ):
+        """
+        """
+
+        # save the database back to the file that we loaded it from.
+        self.db.save_database()
 
     def get_photo_id_from_selection( self ):
         """
@@ -553,6 +563,33 @@ class PhotoRecordViewer( RecordWindow ):
                                                           photo_record["id"],
                                                           *photo_record["resolution"],
                                                           photo_record["state"] ) )
+
+    def closeEvent( self, event ):
+        """
+        """
+
+        # prevent closing when we have open records.
+        if len( self.photo_record_editors ) > 0:
+            event.ignore()
+            return
+        elif self.db.are_data_dirty():
+            # ask the user if they want to discard their changes.
+            confirmation_dialog = QMessageBox()
+            confirmation_dialog.setInformativeText( "Unsaved changes have been made.  Are you sure you want to exit?" )
+            confirmation_dialog.setStandardButtons( QMessageBox.Ok | QMessageBox.Cancel )
+            confirmation_dialog.setDefaultButton( QMessageBox.Cancel )
+
+            result = confirmation_dialog.exec_()
+
+            # nothing to do if we were told this was an accident.
+            if result == QMessageBox.Cancel:
+                event.ignore()
+                return
+
+        # time to go away.
+        event.accept()
+
+        super().closeEvent( event )
 
     def selectionChange( self, selected, deselected ):
         """
@@ -909,6 +946,8 @@ class PhotoRecordEditor( RecordEditor ):
         # update the record based on what's currently visible.
         print( "XXX: do this" )
 
+        self.db.mark_data_dirty()
+
         super().commit_record()
 
     def get_art_id_from_selection( self ):
@@ -1127,6 +1166,20 @@ class PhotoRecordEditor( RecordEditor ):
         print( "Preview art record #{:d}.".format( art_id ) )
 
         #self.preview_photo_record( photo_id )
+
+    def closeEvent( self, event ):
+        """
+        """
+
+        # prevent closing when we have open records.
+        if len( self.art_record_editors ) > 0:
+            event.ignore()
+            return
+
+        # time to go away.
+        event.accept()
+
+        super().closeEvent( event )
 
 class ArtRecordEditor( RecordEditor ):
     """
@@ -1429,6 +1482,8 @@ class ArtRecordEditor( RecordEditor ):
         normalized_geometry = self.photoPreview.get_region_geometry( True )
 
         self.record["region"] = normalized_geometry.getRect()
+
+        self.db.mark_data_dirty()
 
         super().commit_record()
 
