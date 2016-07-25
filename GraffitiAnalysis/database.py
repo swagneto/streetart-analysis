@@ -591,8 +591,8 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
         art_fields_node = etree.Element( "ArtFields" )
 
         art_fields_node.append( create_simple_list_node( art_types, "Types", "Type", "name" ) )
-        art_fields_node.append( create_simple_list_node( art_types, "Sizes", "Size", "name" ) )
-        art_fields_node.append( create_simple_list_node( art_types, "Qualities", "Quality", "name" ) )
+        art_fields_node.append( create_simple_list_node( art_sizes, "Sizes", "Size", "name" ) )
+        art_fields_node.append( create_simple_list_node( art_qualities, "Qualities", "Quality", "name" ) )
 
         return art_fields_node
 
