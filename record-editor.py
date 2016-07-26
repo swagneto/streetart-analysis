@@ -678,7 +678,12 @@ class PhotoRecordViewer( RecordWindow ):
 
                 self.photoPreview.setPixmap( pixmap.scaled( 400, 300, Qt.KeepAspectRatio ) )
                 self.infoStateLabel.setText( photo["state"] )
-                self.infoLocationLabel.setText( "({:f}, {:f})".format( *photo["location"] ) )
+
+                if photo["location"] is not None:
+                    self.infoLocationLabel.setText( "({:f}, {:f})".format( *photo["location"] ) )
+                else:
+                    self.infoLocationLabel.setText( "Unknown!" )
+
                 self.infoAddressLabel.setText( "Unknown!" )
                 self.infoResolutionLabel.setText( "{:d} x {:d}".format( *photo["resolution"] ) )
                 self.infoCreatedLabel.setText( time.strftime( date_format,
