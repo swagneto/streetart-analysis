@@ -1158,6 +1158,33 @@ class Database( object ):
 
         return requested_photos
 
+    def new_photo_record( self, file_name, resolution ):
+        """
+        Inserts a new photo record for the supplied file into the database.
+        Aside from the resolution, default values are used for the record's
+        fields.
+
+        Takes 2 arguments:
+
+          file_name  - Path to the photo on disk.
+          resolution - Tuple specifying the dimensions of the photo.  This
+                       must be a pair of positive integers.
+
+        Returns 1 value:
+
+          photo_record - The created PhotoRecord object.
+
+        """
+
+        # compute a unique index that hasn't been used yet.
+        photo_id = max( [photo["id"] for photo in self.photos] ) + 1
+
+        self.photos.append( PhotoRecord( photo_id, file_name, resolution ) )
+
+        self.mark_data_dirty()
+
+        return self.photos[-1]
+
     def get_art_records( self, photo_ids=None ):
         """
         Retrieves all of the ArtRecord's in the database associated with the
