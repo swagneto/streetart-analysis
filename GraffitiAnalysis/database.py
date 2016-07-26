@@ -229,8 +229,14 @@ def _read_xml_database( filename ):
             # locations as "X, Y".  tags is a comma delimited list of
             # strings.
             resolution = [size for size in map( int, resolution.split( "x" ) )]
-            location   = [where for where in map( float, location.split( "," ) )]
             tags       = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
+
+            # take care to only create a location if the attribute was more
+            # than just whitespace (or empty).
+            if len( location.strip() ) > 0:
+                location = [where for where in map( float, location.split( "," ) )]
+            else:
+                location = None
 
             #
             # NOTE: all of the remaining attributes are fine to be passed as is.
@@ -657,7 +663,12 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
             photo_node.attrib["created_time"]     = str( photo["created_time"] )
             photo_node.attrib["filename"]         = photo["filename"]
             photo_node.attrib["id"]               = str( photo["id"] )
-            photo_node.attrib["location"]         = ", ".join( map( str, photo["location"] ) )
+
+            if photo["location"] is not None:
+                photo_node.attrib["location"]     = ", ".join( map( str, photo["location"] ) )
+            else:
+                photo_node.attrib["location"]     = ""
+
             photo_node.attrib["modified_time"]    = str( photo["modified_time"] )
             photo_node.attrib["processing_state"] = photo["state"]
             photo_node.attrib["resolution"]       = "x".join( map( str, photo["resolution"] ) )
@@ -698,7 +709,12 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
             art_node.attrib["photo_id"]         = str( art["photo_id"] )
             art_node.attrib["processing_state"] = art["state"]
             art_node.attrib["quality"]          = art["quality"]
-            art_node.attrib["region"]           = ", ".join( map( str, art["region"] ) )
+
+            if art["region"] is not None:
+                art_node.attrib["region"]       = ", ".join( map( str, art["region"] ) )
+            else:
+                art_node.attrib["region"]       = ""
+
             art_node.attrib["size"]             = art["size"]
             art_node.attrib["type"]             = art["type"]
             art_node.attrib["vandals"]          = ", ".join( art["vandals"] )
