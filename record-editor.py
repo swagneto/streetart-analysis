@@ -676,7 +676,7 @@ class PhotoRecordViewer( RecordWindow ):
 
                 pixmap = get_pixmap_from_image( photo["filename"] )
 
-                self.photoPreview.setPixmap( pixmap.scaled( 400, 300, Qt.KeepAspectRatio ) )
+                self.photoPreview.setPixmap( pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
                 self.infoStateLabel.setText( photo["state"] )
 
                 if photo["location"] is not None:
