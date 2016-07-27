@@ -918,14 +918,6 @@ class PhotoRecordEditor( RecordEditor ):
         # record selected.
         self.deleteRecordButton.setEnabled( False )
 
-        #   record processing state.
-        self.photoProcessingStateComboBox = QComboBox()
-        for state in self.db.get_processing_states():
-            self.photoProcessingStateComboBox.addItem( state, state )
-        self.photoProcessingStateComboBox.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        self.photoProcessingStateComboLabel = QLabel( "Stat&e:" )
-        self.photoProcessingStateComboLabel.setBuddy( self.photoProcessingStateComboBox )
-
         #   art record summary labels.
         self.artTypeLabel       = QLabel()
         self.artTypeLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
@@ -940,9 +932,25 @@ class PhotoRecordEditor( RecordEditor ):
         self.artVandalsLabel    = QLabel()
         self.artTagsLabel       = QLabel()
 
+        #   photo record processing state.
+        self.photoProcessingStateComboBox = QComboBox()
+        for state in self.db.get_processing_states():
+            self.photoProcessingStateComboBox.addItem( state, state )
+        self.photoProcessingStateComboBox.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.photoProcessingStateComboLabel = QLabel( "Stat&e:" )
+        self.photoProcessingStateComboLabel.setBuddy( self.photoProcessingStateComboBox )
+
+        #   photo record tags.
+        #
+        # NOTE: our accelerator is chosen to match the ArtRecordEditor's
+        #       accelerator.
+        #
+        self.photoTagsLineEdit = QLineEdit( "" )
+        self.photoTagsLabel    = QLabel( "Ta&gs:" )
+        self.photoTagsLabel.setBuddy( self.photoTagsLineEdit )
+
         # XXX: need to add
         #
-        #  * tag editor
         #  * description
 
     def create_layout( self ):
@@ -1001,77 +1009,93 @@ class PhotoRecordEditor( RecordEditor ):
         selection_box.setLayout( selection_layout )
         selection_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
 
-        #   selected art record information.
-        art_stats_layout = QGridLayout()
-        art_stats_layout.setContentsMargins( 0, 0, 0, 0 )
-        art_stats_layout.setSpacing( 0 )
+        #   selected art record information and photo record editing widgets.
+        info_and_edit_layout = QGridLayout()
+        info_and_edit_layout.setContentsMargins( 0, 0, 0, 0 )
+        info_and_edit_layout.setSpacing( 0 )
 
         # XXX: the layout of these labels is *awful*.  need to fix this.
+        art_header_label = QLabel( "<b>Art Record:</b>" )
+        art_header_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        info_and_edit_layout.addWidget( art_header_label,
+                                        0, 0 )
+
         type_label = QLabel( "Type:" )
         type_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( type_label,
-                                    0, 0 )
-        art_stats_layout.addWidget( self.artTypeLabel,
-                                    0, 1 )
+        info_and_edit_layout.addWidget( type_label,
+                                        1, 0 )
+        info_and_edit_layout.addWidget( self.artTypeLabel,
+                                        1, 1 )
 
         size_label = QLabel( "Size:" )
         size_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( size_label,
-                                    1, 0 )
-        art_stats_layout.addWidget( self.artSizeLabel,
-                                    1, 1 )
+        info_and_edit_layout.addWidget( size_label,
+                                        2, 0 )
+        info_and_edit_layout.addWidget( self.artSizeLabel,
+                                        2, 1 )
 
         quality_label = QLabel( "Quality:" )
         quality_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( quality_label,
-                                    2, 0 )
-        art_stats_layout.addWidget( self.artQualityLabel,
-                                    2, 1 )
+        info_and_edit_layout.addWidget( quality_label,
+                                        3, 0 )
+        info_and_edit_layout.addWidget( self.artQualityLabel,
+                                        3, 1 )
 
         date_label = QLabel( "Date:" )
         date_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( date_label,
-                                    3, 0 )
-        art_stats_layout.addWidget( self.artDateLabel,
-                                    3, 1 )
-
-        self.photoProcessingStateComboLabel.setSizePolicy( QSizePolicy.Fixed,
-                                                           QSizePolicy.Fixed )
-        art_stats_layout.addWidget( self.photoProcessingStateComboLabel,
-                                    4, 0 )
-        art_stats_layout.addWidget( self.photoProcessingStateComboBox,
-                                    4, 1 )
+        info_and_edit_layout.addWidget( date_label,
+                                        4, 0 )
+        info_and_edit_layout.addWidget( self.artDateLabel,
+                                        4, 1 )
 
         artists_label = QLabel( "Artists:" )
         artists_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( artists_label,
-                                    0, 2 )
-        art_stats_layout.addWidget( self.artArtistsLabel,
-                                    0, 3 )
+        info_and_edit_layout.addWidget( artists_label,
+                                        1, 2 )
+        info_and_edit_layout.addWidget( self.artArtistsLabel,
+                                        1, 3 )
 
         associates_label = QLabel( "Associates:" )
         associates_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( associates_label,
-                                    1, 2 )
-        art_stats_layout.addWidget( self.artAssociatesLabel,
-                                    1, 3 )
+        info_and_edit_layout.addWidget( associates_label,
+                                        2, 2 )
+        info_and_edit_layout.addWidget( self.artAssociatesLabel,
+                                        2, 3 )
 
         vandals_label = QLabel( "Vandals:" )
         vandals_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( vandals_label,
-                                    2, 2 )
-        art_stats_layout.addWidget( self.artVandalsLabel,
-                                    2, 3 )
+        info_and_edit_layout.addWidget( vandals_label,
+                                        3, 2 )
+        info_and_edit_layout.addWidget( self.artVandalsLabel,
+                                        3, 3 )
 
         tags_label = QLabel( "Tags:" )
         tags_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        art_stats_layout.addWidget( tags_label,
-                                    3, 2 )
-        art_stats_layout.addWidget( self.artTagsLabel,
-                                    3, 3 )
+        info_and_edit_layout.addWidget( tags_label,
+                                        4, 2 )
+        info_and_edit_layout.addWidget( self.artTagsLabel,
+                                        4, 3 )
+
+        photo_header_label = QLabel( "<b>Photo Record:</b>" )
+        photo_header_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        info_and_edit_layout.addWidget( photo_header_label,
+                                        5, 0 )
+
+        self.photoProcessingStateComboLabel.setSizePolicy( QSizePolicy.Fixed,
+                                                           QSizePolicy.Fixed )
+        info_and_edit_layout.addWidget( self.photoProcessingStateComboLabel,
+                                        6, 0 )
+        info_and_edit_layout.addWidget( self.photoProcessingStateComboBox,
+                                        6, 1 )
+
+        info_and_edit_layout.addWidget( self.photoTagsLabel,
+                                        7, 0 )
+        info_and_edit_layout.addWidget( self.photoTagsLineEdit,
+                                        7, 1,
+                                        1, 3 )
 
         art_stats_box = QGroupBox()
-        art_stats_box.setLayout( art_stats_layout )
+        art_stats_box.setLayout( info_and_edit_layout )
 
         horizontal_layout.addWidget( selection_box )
         horizontal_layout.addWidget( art_stats_box )
@@ -1140,6 +1164,8 @@ class PhotoRecordEditor( RecordEditor ):
         # update the record based on what's currently visible if requested.
         if update_photo_state:
             self.record["state"] = self.photoProcessingStateComboBox.currentText()
+            self.record["tags"]  = list( map( lambda x: x.strip(),
+                                              self.photoTagsLineEdit.text().split( ", " ) ) )
 
             self.db.mark_data_dirty()
 
