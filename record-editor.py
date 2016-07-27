@@ -49,6 +49,7 @@
 #     it propagate downward in a layout?
 
 from functools import lru_cache, partial
+import os
 import time
 
 from PyQt5.QtCore import ( Qt, QItemSelectionModel, QRect, QRegExp, QSize,
@@ -719,12 +720,26 @@ class PhotoRecordViewer( RecordWindow ):
             if photo["id"] == photo_id:
                 date_format = "%Y/%m/%d %H:%M:%S"
 
-                pixmap    = get_pixmap_from_image( photo["filename"] )
-
+                # figure out if we have a file on disk we can load.
+                #
+                # NOTE: not sure what the best timestamp in this case is,
+                #       though setting it to the Epoch seems better than other
+                #       choices (now, the file's creation/modification
+                #       timestamps, etc).
+                #
                 # XXX: we need to be careful and handle the data with non-GMT
                 #      timestamps properly.  this won't be encoded in the files
                 #      but needs to be handled during insert into the database.
-                exif_time = get_exif_timestamp( photo["filename"] )
+                #
+                if os.path.isfile( photo["filename"] ):
+                    try:
+                        pixmap    = get_pixmap_from_image( photo["filename"] )
+                        exif_time = get_exif_timestamp( photo["filename"] )
+                    except:
+                        exif_time = 0
+                else:
+                    pixmap    = QPixmap()
+                    exif_time = 0
 
                 # count the number of child art records in each of the
                 # processing states.
