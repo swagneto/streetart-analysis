@@ -64,6 +64,39 @@ from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
 import GraffitiAnalysis.database as grafdb
 import GraffitiAnalysis.widgets as grafwidgets
 
+def get_exif_timestamp( file_name ):
+    """
+    Extracts the creation time from a file containing Exif metadata and
+    returns it as seconds since the Epoch.  The 0th IFD's DateTime field is
+    used for the creation time.
+
+    Raises ValueError if the specified file's Exif metadata cannot be parsed.
+
+    Takes 1 argument:
+
+      file_name - Path to the file to extract the timestamp from.
+
+    Returns 1 value:
+
+      timestamp - Seconds since the Epoch when the file was created.
+
+    """
+
+    import piexif
+
+    exif_data = piexif.load( file_name )
+    exif_str  = exif_data["0th"][piexif.ImageIFD.DateTime].decode( "utf-8" )
+
+    # convert "YYYY:MM:DD hh:mm:ss" into a tuple that we can pass to
+    # time.mktime().
+    exif_date, exif_time = (map( lambda x: x.split( ":" ), exif_str.split() ))
+    exif_date            = tuple( map( int, exif_date ) )
+    exif_time            = tuple( map( int, exif_time ) )
+
+    # note that we don't have the day of year/month information.  we also
+    # want a non-DST timestamp.
+    return time.mktime( (*exif_date, *exif_time, 0, 0, 0) )
+
 class RecordWindow( QMainWindow ):
     def __init__( self, window_size=None, close_callback=None ):
         """
@@ -363,14 +396,12 @@ class PhotoRecordViewer( RecordWindow ):
         self.photoPreview.setScaledContents( True )
         self.photoPreview.setMinimumSize( 400, 300 )
 
-        # XXX: change these defaults
-        self.infoStateLabel      = QLabel()
-        self.infoLocationLabel   = QLabel()
-        self.infoAddressLabel    = QLabel()
-        self.infoResolutionLabel = QLabel()
-        self.infoCreatedLabel    = QLabel()
-        self.infoModifiedLabel   = QLabel()
-        self.infoTagsLabel       = QLabel()
+        # informational labels for the photo record.
+        self.infoStateLabel    = QLabel()
+        self.infoSummaryLabel  = QLabel()
+        self.infoLocationLabel = QLabel()
+        self.infoTakenLabel    = QLabel()
+        self.infoTagsLabel     = QLabel()
 
     def create_layout( self ):
         """
@@ -424,35 +455,25 @@ class PhotoRecordViewer( RecordWindow ):
         stats_layout.addWidget( self.infoStateLabel,
                                 0, 1 )
 
-        stats_layout.addWidget( QLabel( "Location:" ),
+        stats_layout.addWidget( QLabel( "Art Records:" ),
                                 1, 0 )
-        stats_layout.addWidget( self.infoLocationLabel,
+        stats_layout.addWidget( self.infoSummaryLabel,
                                 1, 1 )
 
-        stats_layout.addWidget( QLabel( "Address:" ),
+        stats_layout.addWidget( QLabel( "Location:" ),
                                 2, 0 )
-        stats_layout.addWidget( self.infoAddressLabel,
+        stats_layout.addWidget( self.infoLocationLabel,
                                 2, 1 )
 
-        stats_layout.addWidget( QLabel( "Resolution:" ),
+        stats_layout.addWidget( QLabel( "Taken:" ),
                                 3, 0 )
-        stats_layout.addWidget( self.infoResolutionLabel,
+        stats_layout.addWidget( self.infoTakenLabel,
                                 3, 1 )
 
-        stats_layout.addWidget( QLabel( "Created:" ),
-                                4, 0 )
-        stats_layout.addWidget( self.infoCreatedLabel,
-                                4, 1 )
-
-        stats_layout.addWidget( QLabel( "Modified:" ),
-                                5, 0 )
-        stats_layout.addWidget( self.infoModifiedLabel,
-                                5, 1 )
-
         stats_layout.addWidget( QLabel( "Tags:" ),
-                                6, 0 )
+                                4, 0 )
         stats_layout.addWidget( self.infoTagsLabel,
-                                6, 1 )
+                                4, 1 )
 
         stats_box.setLayout( stats_layout )
 
@@ -698,22 +719,48 @@ class PhotoRecordViewer( RecordWindow ):
             if photo["id"] == photo_id:
                 date_format = "%Y/%m/%d %H:%M:%S"
 
-                pixmap = get_pixmap_from_image( photo["filename"] )
+                pixmap    = get_pixmap_from_image( photo["filename"] )
 
+                # XXX: we need to be careful and handle the data with non-GMT
+                #      timestamps properly.  this won't be encoded in the files
+                #      but needs to be handled during insert into the database.
+                exif_time = get_exif_timestamp( photo["filename"] )
+
+                # count the number of child art records in each of the
+                # processing states.
+                reviewed_count     = 0
+                unreviewed_count   = 0
+                needs_review_count = 0
+                record_count       = 0
+
+                for art in self.db.get_art_records( photo_id ):
+                    if art["state"] == "reviewed":
+                        reviewed_count += 1
+                    elif art["state"] == "unreviewed":
+                        unreviewed_count += 1
+                    elif art["state"] == "needs_review":
+                        needs_review_count += 1
+
+                    record_count += 1
+
+                # set a preview photo.
                 self.photoPreview.setPixmap( pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
+
+                # update the labels.
                 self.infoStateLabel.setText( photo["state"] )
+                self.infoSummaryLabel.setText( "{:d} record{:s} ({:2d}/{:2d}/{:2d})".format( record_count,
+                                                                                             "" if record_count == 1 else "s",
+                                                                                             reviewed_count,
+                                                                                             unreviewed_count,
+                                                                                             needs_review_count ) )
 
                 if photo["location"] is not None:
-                    self.infoLocationLabel.setText( "({:f}, {:f})".format( *photo["location"] ) )
+                    self.infoLocationLabel.setText( "({:8.5f}, {:8.5f})".format( *photo["location"] ) )
                 else:
                     self.infoLocationLabel.setText( "Unknown!" )
 
-                self.infoAddressLabel.setText( "Unknown!" )
-                self.infoResolutionLabel.setText( "{:d} x {:d}".format( *photo["resolution"] ) )
-                self.infoCreatedLabel.setText( time.strftime( date_format,
-                                                              time.gmtime( photo["created_time"] ) ) )
-                self.infoModifiedLabel.setText( time.strftime( date_format,
-                                                              time.gmtime( photo["modified_time"] ) ) )
+                self.infoTakenLabel.setText( time.strftime( date_format,
+                                                            time.gmtime( exif_time ) ) )
 
                 if len( photo["tags"] ) > 0:
                     self.infoTagsLabel.setText( ", ".join( photo["tags"] ) )
@@ -728,7 +775,7 @@ class PhotoRecordViewer( RecordWindow ):
             self.infoLocationLabel.clear()
             self.infoAddressLabel.clear()
             self.infoResolutionLabel.clear()
-            self.infoCreatedLabel.clear()
+            self.infoTakenLabel.clear()
             self.infoModifiedLabel.clear()
             self.infoTagsLabel.clear()
 
@@ -1057,21 +1104,29 @@ class PhotoRecordEditor( RecordEditor ):
         # select the first entry so we can use the keyboard for navigation.
         self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, 0 ) )
 
-    def commit_record( self ):
+    def commit_record( self, update_photo_state=True ):
         """
         Updates the PhotoRecordEditor's internal record with user selected
         values before invoking the parent class' method.
 
-        Takes no arguments.
+        Takes 1 argument:
+
+          update_photo_state - Optional flag indicating whether the photo
+                               record's state should be commited.  If False,
+                               the state is not actually commited, but the
+                               parent class' method is invoked to signal
+                               a change related to the record (e.g. a child
+                               art record has been added or removed).  If
+                               omitted, defaults to True.
 
         Returns nothing.
         """
-        print( "Commiting photo record #{:d}.".format( self.record["id"] ) )
 
-        # update the record based on what's currently visible.
-        self.record["state"] = self.photoProcessingStateComboBox.currentText()
+        # update the record based on what's currently visible if requested.
+        if update_photo_state:
+            self.record["state"] = self.photoProcessingStateComboBox.currentText()
 
-        self.db.mark_data_dirty()
+            self.db.mark_data_dirty()
 
         super().commit_record()
 
@@ -1124,6 +1179,9 @@ class PhotoRecordEditor( RecordEditor ):
         # edit the record as a convenience.
         self.edit_art_record( new_art_record["id"] )
 
+        # signal our parent that we have updated state.
+        self.commit_record( update_photo_state=False )
+
     def delete_record( self ):
         """
         """
@@ -1161,6 +1219,9 @@ class PhotoRecordEditor( RecordEditor ):
 
         # and remove the rubberband from our photo.
         self.photoPreview.remove_band( art_id )
+
+        # signal our parent that we have updated state.
+        self.commit_record( update_photo_state=False )
 
     def edit_art_record( self, art_id ):
         """
