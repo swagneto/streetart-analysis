@@ -293,13 +293,15 @@ def _read_xml_database( filename ):
             created_time  = float( attributes.pop( "created_time", None ) )
             modified_time = float( attributes.pop( "modified_time", None ) )
             region        = attributes.pop( "region", None )
+            tags          = attributes.pop( "tags", "" )
 
             # handle conversion between our XML and internal Python
-            # representations.  artists, associates, and vandals are all comma
-            # delimited lists.  region is a comma delimited 4-tuple of
+            # representations.  artists, associates, tags, and vandals are all
+            # comma delimited lists.  region is a comma delimited 4-tuple of
             # normalized floats.
             artists    = [string for string in map( lambda x: x.strip(), artists.split( "," ) )]
             associates = [string for string in map( lambda x: x.strip(), associates.split( "," ) )]
+            tags       = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
             vandals    = [string for string in map( lambda x: x.strip(), vandals.split( "," ) )]
 
             if region is not None:
@@ -314,6 +316,7 @@ def _read_xml_database( filename ):
                                    modified_time=modified_time,
                                    region=region,
                                    state=state,
+                                   tags=tags,
                                    vandals=vandals,
                                    **attributes ) )
 
@@ -716,6 +719,7 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
                 art_node.attrib["region"]       = ""
 
             art_node.attrib["size"]             = art["size"]
+            art_node.attrib["tags"]             = ", ".join( art["tags"] )
             art_node.attrib["type"]             = art["type"]
             art_node.attrib["vandals"]          = ", ".join( art["vandals"] )
 
@@ -839,17 +843,18 @@ class ArtRecord( Record ):
       *size           String representing the art's physical size.
       *state          String representing the processing state the record is
                       in.
+      *tags           List, possibly empty, of tags associated with the art.
       *type           String specifying the type of the art.
       *vandals        List, possibly empty, of artists who have vandalized the
                       art.
 
     """
 
-    def __init__( self, id, photo_id, type, artists=["Unknown"], associates=[], size="medium", quality="fair", vandals=[], created_time=None, modified_time=None, date=None, state=None, region=None ):
+    def __init__( self, id, photo_id, type, artists=["Unknown"], associates=[], size="medium", quality="fair", vandals=[], created_time=None, modified_time=None, date=None, tags=[], state=None, region=None ):
         """
         Constructs an ArtRecord object from the supplied parameters.
 
-        Takes 13 arguments:
+        Takes 14 arguments:
 
           id            - Identifier for the art record.  Must be a positive
                           integer, different from other record identifiers.
@@ -879,6 +884,9 @@ class ArtRecord( Record ):
                           time.
           date          - Optional year, as a four digit integer, indicating when the
                           physical art was created.  If omitted, defaults to None.
+          tags          - Optional, possibly empty, list of strings specifying
+                          tags for the art.  If omitted, defaults to an empty
+                          list.
           state         - Optional string specifying the processing state of the
                           record.  If omitted, defaults to "unreviewed".
           region        - Optional tuple of (x, y, width, height) values, normalized
@@ -903,9 +911,9 @@ class ArtRecord( Record ):
 
         _readable_keys = ["artists", "associates", "created_time", "date",
                           "id", "modified_time", "photo_id", "quality",
-                          "region", "size", "state", "type", "vandals"]
+                          "region", "size", "state", "tags", "type", "vandals"]
         _mutable_keys = ["artists", "associates", "date", "modified_time",
-                         "quality", "region", "size", "state", "type",
+                         "quality", "region", "size", "state", "tags", "type",
                          "vandals"]
 
         # XXX: validation of type, artists (must not be empty), associates,
@@ -925,6 +933,7 @@ class ArtRecord( Record ):
                           region=region,
                           size=size,
                           state=state,
+                          tags=tags,
                           type=type,
                           vandals=vandals )
 

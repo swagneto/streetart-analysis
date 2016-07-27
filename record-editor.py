@@ -1342,6 +1342,7 @@ class PhotoRecordEditor( RecordEditor ):
         self.artArtistsLabel.setText( ", ".join( art_record["artists"] ) )
         self.artAssociatesLabel.setText( ", ".join( art_record["associates"] ) )
         self.artVandalsLabel.setText( ", ".join( art_record["vandals"] ) )
+        self.artTagsLabel.setText( ", ".join( art_record["tags"] ) )
 
     def recordSelectionChange( self, selected, deslected ):
         """
@@ -1550,6 +1551,11 @@ class ArtRecordEditor( RecordEditor ):
         self.artVandalsListLabel = QLabel( "&Vandals:" )
         self.artVandalsListLabel.setBuddy( self.artVandalsListView )
 
+        #  line editor for tags.
+        self.artTagsLineEdit = QLineEdit( "" )
+        self.artTagsLabel    = QLabel( "Ta&gs:" )
+        self.artTagsLabel.setBuddy( self.artTagsLineEdit )
+
     def create_layout( self ):
         """
         Lays out the widgets within an ArtRecordEditor.
@@ -1612,6 +1618,12 @@ class ArtRecordEditor( RecordEditor ):
                                   1, 7,
                                   4, 1 )
 
+        editing_layout.addWidget( self.artTagsLabel,
+                                  6, 0 )
+        editing_layout.addWidget( self.artTagsLineEdit,
+                                  6, 1,
+                                  1, 7 )
+
         editing_box = QGroupBox()
         editing_box.setLayout( editing_layout )
 
@@ -1664,6 +1676,7 @@ class ArtRecordEditor( RecordEditor ):
         self.artQualityComboBox.setCurrentIndex( self.artQualityComboBox.findText( self.record["quality"] ) )
         self.artDateLineEdit.setText( "" if self.record["date"] is None else self.record["date"] )
         self.artProcessingStateComboBox.setCurrentIndex( self.artProcessingStateComboBox.findText( self.record["state"] ) )
+        self.artTagsLineEdit.setText( "" if len( self.record["tags"] ) == 0 else ", ".join( self.record["tags"] ) )
 
         # ensure that we start with an empty selection view.
         self.artArtistsListView.selectionModel().clear()
@@ -1706,6 +1719,8 @@ class ArtRecordEditor( RecordEditor ):
         self.record["date"]          = self.artDateLineEdit.text()
         self.record["state"]         = self.artProcessingStateComboBox.currentText()
         self.record["modified_time"] = time.mktime( time.gmtime() )
+        self.record["tags"]          = list( map( lambda x: x.strip(),
+                                                  self.artTagsLineEdit.text().split( ", " ) ) )
 
         self.record["artists"]       = [artist.data() for artist in self.artArtistsListView.selectedIndexes()]
         self.record["associates"]    = [associate.data() for associate in self.artAssociatesListView.selectedIndexes()]
