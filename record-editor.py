@@ -849,9 +849,30 @@ class PhotoRecordEditor( RecordEditor ):
         # record selected.
         self.deleteRecordButton.setEnabled( False )
 
+        #   record processing state.
+        self.photoProcessingStateComboBox = QComboBox()
+        for state in self.db.get_processing_states():
+            self.photoProcessingStateComboBox.addItem( state, state )
+        self.photoProcessingStateComboBox.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.photoProcessingStateComboLabel = QLabel( "Stat&e:" )
+        self.photoProcessingStateComboLabel.setBuddy( self.photoProcessingStateComboBox )
+
+        #   art record summary labels.
+        self.artTypeLabel       = QLabel()
+        self.artTypeLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.artSizeLabel       = QLabel()
+        self.artSizeLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.artQualityLabel    = QLabel()
+        self.artQualityLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.artDateLabel       = QLabel()
+        self.artDateLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        self.artArtistsLabel    = QLabel()
+        self.artAssociatesLabel = QLabel()
+        self.artVandalsLabel    = QLabel()
+        self.artTagsLabel       = QLabel()
+
         # XXX: need to add
         #
-        #  * photo record state combo box
         #  * tag editor
         #  * description
 
@@ -892,6 +913,7 @@ class PhotoRecordEditor( RecordEditor ):
         selection_type_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
         selection_type_box.setLayout( selection_type_layout )
 
+        #   art record creation/deletion buttons.
         record_modification_layout = QHBoxLayout()
         record_modification_layout.setContentsMargins( 0, 0, 0, 0 )
         record_modification_layout.setSpacing( 0 )
@@ -908,8 +930,82 @@ class PhotoRecordEditor( RecordEditor ):
 
         selection_box = QGroupBox()
         selection_box.setLayout( selection_layout )
+        selection_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
+
+        #   selected art record information.
+        art_stats_layout = QGridLayout()
+        art_stats_layout.setContentsMargins( 0, 0, 0, 0 )
+        art_stats_layout.setSpacing( 0 )
+
+        # XXX: the layout of these labels is *awful*.  need to fix this.
+        type_label = QLabel( "Type:" )
+        type_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( type_label,
+                                    0, 0 )
+        art_stats_layout.addWidget( self.artTypeLabel,
+                                    0, 1 )
+
+        size_label = QLabel( "Size:" )
+        size_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( size_label,
+                                    1, 0 )
+        art_stats_layout.addWidget( self.artSizeLabel,
+                                    1, 1 )
+
+        quality_label = QLabel( "Quality:" )
+        quality_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( quality_label,
+                                    2, 0 )
+        art_stats_layout.addWidget( self.artQualityLabel,
+                                    2, 1 )
+
+        date_label = QLabel( "Date:" )
+        date_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( date_label,
+                                    3, 0 )
+        art_stats_layout.addWidget( self.artDateLabel,
+                                    3, 1 )
+
+        self.photoProcessingStateComboLabel.setSizePolicy( QSizePolicy.Fixed,
+                                                           QSizePolicy.Fixed )
+        art_stats_layout.addWidget( self.photoProcessingStateComboLabel,
+                                    4, 0 )
+        art_stats_layout.addWidget( self.photoProcessingStateComboBox,
+                                    4, 1 )
+
+        artists_label = QLabel( "Artists:" )
+        artists_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( artists_label,
+                                    0, 2 )
+        art_stats_layout.addWidget( self.artArtistsLabel,
+                                    0, 3 )
+
+        associates_label = QLabel( "Associates:" )
+        associates_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( associates_label,
+                                    1, 2 )
+        art_stats_layout.addWidget( self.artAssociatesLabel,
+                                    1, 3 )
+
+        vandals_label = QLabel( "Vandals:" )
+        vandals_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( vandals_label,
+                                    2, 2 )
+        art_stats_layout.addWidget( self.artVandalsLabel,
+                                    2, 3 )
+
+        tags_label = QLabel( "Tags:" )
+        tags_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        art_stats_layout.addWidget( tags_label,
+                                    3, 2 )
+        art_stats_layout.addWidget( self.artTagsLabel,
+                                    3, 3 )
+
+        art_stats_box = QGroupBox()
+        art_stats_box.setLayout( art_stats_layout )
 
         horizontal_layout.addWidget( selection_box )
+        horizontal_layout.addWidget( art_stats_box )
 
         horizontal_box = QGroupBox()
         horizontal_box.setLayout( horizontal_layout )
@@ -1122,6 +1218,11 @@ class PhotoRecordEditor( RecordEditor ):
                 if art["region"] is not None:
                     self.photoPreview.add_band( art["id"], art["region"] )
 
+                # if record we're updating is the one that is selected, also
+                # update the preview so that the photo and labels are correct.
+                if art_id == self.get_art_id_from_selection():
+                    self.preview_art_record( art_id )
+
                 print( "    Type:         {:s}\n"
                        "    Artists:      {:s}\n"
                        "    Associations: {:s}\n"
@@ -1137,6 +1238,43 @@ class PhotoRecordEditor( RecordEditor ):
                                                         art["region"] ) )
                 break
 
+    def preview_art_record( self, art_id ):
+        """
+        Updates the window to preview the specified art identifier.  The photo
+        preview is updated to highlight the associated art record's region and
+        the information labels are set to the record's contents.
+
+        Previewing an unknown art record is silently ignored without updating
+        widgets.
+
+        Takes 1 argument:
+
+          art_id - Art record identifier to preview.
+
+        Returns nothing.
+        """
+        # find the currently selected record.
+        for art_record in self.art_records:
+            if art_record["id"] == art_id:
+                record = art_record
+                break
+        else:
+            # we couldn't find a record with the specified identifier, so go
+            # home without doing anything.
+            return
+
+        # set the new selection on our photo preview.
+        self.photoPreview.set_selection( art_id )
+
+        # update the labels.
+        self.artTypeLabel.setText( art_record["type"] )
+        self.artSizeLabel.setText( art_record["size"] )
+        self.artQualityLabel.setText( art_record["quality"] )
+        self.artDateLabel.setText( art_record["date"] )
+        self.artArtistsLabel.setText( ", ".join( art_record["artists"] ) )
+        self.artAssociatesLabel.setText( ", ".join( art_record["associates"] ) )
+        self.artVandalsLabel.setText( ", ".join( art_record["vandals"] ) )
+
     def recordSelectionChange( self, selected, deslected ):
         """
         """
@@ -1149,7 +1287,9 @@ class PhotoRecordEditor( RecordEditor ):
             # nothing is selected, so we can't delete anything.
             self.deleteRecordButton.setEnabled( False )
         else:
-            self.photoPreview.set_selection( self.get_art_id_from_selection() )
+            art_id = self.get_art_id_from_selection()
+
+            self.preview_art_record( art_id )
 
             # now that something is selected, we have the opportunity to
             # delete it.
