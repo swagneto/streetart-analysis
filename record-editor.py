@@ -1084,7 +1084,7 @@ class PhotoRecordEditor( RecordEditor ):
                                  triggered=self.close )
 
         self.commitAct = QAction( "&Commit", self, shortcut="Ctrl+S",
-                                  triggered=self.commit_record )
+                                  triggered=lambda: self.commit_record( update_photo_state=True ) )
 
         self.windowMenu = QMenu( "&Window", self )
         self.windowMenu.addAction( self.commitAct )
