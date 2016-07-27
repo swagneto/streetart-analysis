@@ -529,14 +529,27 @@ class PhotoRecordViewer( RecordWindow ):
 
     def get_photo_id_from_selection( self ):
         """
+        Returns the identifier from the current selection.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          identifier - Identifier of the current selection.  Returns None if
+                       there isn't a current selection.
+
         """
 
         # get our view's index of the data activated, then map it back to the
         # original model's index system so we can get the item's text.
 
+        current_selection = self.selectionView.selectedIndexes()
+        if len( current_selection ) == 0:
+            return None
+
         # take any of the selected indices (the entire visible row will be
         # returned) and map it back to original model's indices.
-        proxy_index = self.selectionView.selectedIndexes()[0]
+        proxy_index = current_selection[0]
         index       = self.proxyPhotosModel.mapToSource( proxy_index )
 
         # get the ID column (which is hidden in the proxy's view) in the
@@ -594,14 +607,13 @@ class PhotoRecordViewer( RecordWindow ):
     def selectionChange( self, selected, deselected ):
         """
         """
+        photo_id = self.get_photo_id_from_selection()
 
         # we're not interested in deselection events.  these occur when the
         # user control clicks a selected entry and when the the proxy model
         # filters out the previously visible selection.
-        if len( selected.indexes() ) == 0:
+        if photo_id is None:
             return
-
-        photo_id = self.get_photo_id_from_selection()
 
         self.preview_photo_record( photo_id )
 
@@ -609,10 +621,15 @@ class PhotoRecordViewer( RecordWindow ):
         """
         """
 
-        # XXX: we can still receive a double click even if there isn't a selection
-        #      select something, then ctrl-click it within the window...
-
         photo_id = self.get_photo_id_from_selection()
+        if photo_id is None:
+            #
+            # NOTE: we can still receive a double click even if there isn't a
+            #       selection (e.g. select something, then ctrl-click it
+            #       within the double click window) so I think it's best to
+            #       ignore that case here.
+            #
+            return
 
         # if we're already editing this record, then focus that window instead
         # of creating a new one.
@@ -957,14 +974,27 @@ class PhotoRecordEditor( RecordEditor ):
 
     def get_art_id_from_selection( self ):
         """
+        Returns the identifier from the current selection.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          identifier - Identifier of the current selection.  Returns None if
+                       there isn't a current selection.
+
         """
 
         # get our view's index of the data activated, then map it back to the
         # original model's index system so we can get the item's text.
 
+        current_selection = self.selectionView.selectedIndexes()
+        if len( current_selection ) == 0:
+            return None
+
         # take any of the selected indices (the entire visible row will be
         # returned) and map it back to original model's indices.
-        proxy_index = self.selectionView.selectedIndexes()[0]
+        proxy_index = current_selection[0]
         index       = self.proxyArtModel.mapToSource( proxy_index )
 
         # get the ID column (which is hidden in the proxy's view) in the
@@ -1131,10 +1161,15 @@ class PhotoRecordEditor( RecordEditor ):
         """
         """
 
-        # XXX: we can still receive a double click even if there isn't a selection
-        #      select something, then ctrl-click it within the window...
-
         art_id = self.get_art_id_from_selection()
+        if art_id is None:
+            #
+            # NOTE: we can still receive a double click even if there isn't a
+            #       selection (e.g. select something, then ctrl-click it
+            #       within the double click window) so I think it's best to
+            #       ignore that case here.
+            #
+            return
 
         self.edit_art_record( art_id )
 
