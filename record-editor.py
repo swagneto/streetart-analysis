@@ -564,18 +564,25 @@ class PhotoRecordViewer( RecordWindow ):
         self.photo_record_editors.pop( photo_id, None )
 
     def refresh_photo_record( self, photo_id ):
-        print( "Need to refresh photo record #{:d}.".format( photo_id ) )
 
-        photo_record = self.db.get_photo_records( photo_id )
+        # update the model's information about this record's state.
+        for photo in self.photos:
+            if photo["id"] == photo_id:
+                # find this record in the model by it's photo identifier
+                # (there can, and will, only be one) and update it's
+                # processing state.
+                index = self.photosModel.match( self.photosModel.index( 0, 0 ),
+                                                Qt.DisplayRole,
+                                                str( photo_id ),
+                                                1,
+                                                Qt.MatchFixedString )[0]
 
-        print( photo_record["filename"] )
-        print( photo_record["id"] )
-        print( photo_record["resolution"] )
-        print( photo_record["state"] )
-        print( "{:s} ({:d}): ({:d}, {:d}) [{:s}]".format( photo_record["filename"],
-                                                          photo_record["id"],
-                                                          *photo_record["resolution"],
-                                                          photo_record["state"] ) )
+                self.photosModel.setData( index.sibling( index.row(), 2 ), photo["state"] )
+
+        # update the preview of this record if it's currently selected.
+        # otherwise the next time it is selected we'll see the new changes.
+        if photo_id == self.get_photo_id_from_selection():
+            self.preview_photo_record( photo_id )
 
     def closeEvent( self, event ):
         """
@@ -1062,7 +1069,7 @@ class PhotoRecordEditor( RecordEditor ):
         print( "Commiting photo record #{:d}.".format( self.record["id"] ) )
 
         # update the record based on what's currently visible.
-        print( "XXX: do this" )
+        self.record["state"] = self.photoProcessingStateComboBox.currentText()
 
         self.db.mark_data_dirty()
 
