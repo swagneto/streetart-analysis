@@ -305,7 +305,10 @@ def _read_xml_database( filename ):
             vandals    = [string for string in map( lambda x: x.strip(), vandals.split( "," ) )]
 
             if region is not None:
-                region = tuple( [value for value in map( float, region.split( "," ))] )
+                if region != "":
+                    region = tuple( [value for value in map( float, region.split( "," ))] )
+                else:
+                    region = None
 
             art.append( ArtRecord( id,
                                    photo_id,
