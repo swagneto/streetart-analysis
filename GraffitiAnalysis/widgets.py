@@ -429,7 +429,7 @@ class MultiRubberBandedPixmap( QLabel ):
             pen = QPen( Qt.DashLine )
             pen.setWidth( self.line_width )
 
-            if tag is self.selected_tag:
+            if tag == self.selected_tag:
                 pen.setColor( self.line_colors[1] )
             else:
                 pen.setColor( self.line_colors[0] )
