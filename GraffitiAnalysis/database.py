@@ -217,26 +217,31 @@ def _read_xml_database( filename ):
             resolution    = attributes.pop( "resolution", None )
 
             # ... and these are the optional ones.
-            state         = attributes.pop( "processing_state", None )  # name change.
-            created_time  = float( attributes.pop( "created_time", None ) )
-            modified_time = float( attributes.pop( "modified_time", None ) )
+            state         = attributes.pop( "processing_state", "unreviewed" )  # name change.
+            created_time  = float( attributes.pop( "created_time", "0.0" ) )
+            modified_time = float( attributes.pop( "modified_time", "0.0" ) )
             location      = attributes.pop( "location", None )
-            rotation      = int( attributes.pop( "rotation", None ) )
-            tags          = attributes.pop( "tags", None )
+            rotation      = int( attributes.pop( "rotation", "0" ) )
+            tags          = attributes.pop( "tags", "" )
 
             # handle conversion between our XML and internal Python
             # representations.  resolutions are specified as "NxM" and
             # locations as "X, Y".  tags is a comma delimited list of
             # strings.
             resolution = [size for size in map( int, resolution.split( "x" ) )]
-            tags       = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
+
+            if tags == "":
+                tags = []
+            else:
+                tags = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
 
             # take care to only create a location if the attribute was more
             # than just whitespace (or empty).
-            if len( location.strip() ) > 0:
-                location = [where for where in map( float, location.split( "," ) )]
-            else:
-                location = None
+            if location is not None:
+                if location == "":
+                    location = None
+                else:
+                    location = [where for where in map( float, location.split( "," ) )]
 
             #
             # NOTE: all of the remaining attributes are fine to be passed as is.
@@ -286,10 +291,10 @@ def _read_xml_database( filename ):
             art_type      = attributes.pop( "type", None )
 
             # ... and these are the optional ones.
-            state         = attributes.pop( "processing_state", None )  # name change.
-            artists       = attributes.pop( "artists", None )
-            associates    = attributes.pop( "associates", None )
-            vandals       = attributes.pop( "vandals", None )
+            state         = attributes.pop( "processing_state", "unreviewed" )  # name change.
+            artists       = attributes.pop( "artists", "Unknown" )
+            associates    = attributes.pop( "associates", "" )
+            vandals       = attributes.pop( "vandals", "" )
             created_time  = float( attributes.pop( "created_time", None ) )
             modified_time = float( attributes.pop( "modified_time", None ) )
             region        = attributes.pop( "region", None )
@@ -299,16 +304,25 @@ def _read_xml_database( filename ):
             # representations.  artists, associates, tags, and vandals are all
             # comma delimited lists.  region is a comma delimited 4-tuple of
             # normalized floats.
-            artists    = [string for string in map( lambda x: x.strip(), artists.split( "," ) )]
-            associates = [string for string in map( lambda x: x.strip(), associates.split( "," ) )]
-            tags       = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
-            vandals    = [string for string in map( lambda x: x.strip(), vandals.split( "," ) )]
+            if artists == "":
+                artists = ["Unknown"]
+            else:
+                artists = [string for string in map( lambda x: x.strip(), artists.split( "," ) )]
+            if associates == "":
+                associates = []
+            else:
+                associates = [string for string in map( lambda x: x.strip(), associates.split( "," ) )]
+            if tags == "":
+                tags = []
+            else:
+                tags = [string for string in map( lambda x: x.strip(), tags.split( "," ) )]
+            if vandals == "":
+                vandals = []
+            else:
+                vandals = [string for string in map( lambda x: x.strip(), vandals.split( "," ) )]
 
             if region is not None:
-                if region != "":
-                    region = tuple( [value for value in map( float, region.split( "," ))] )
-                else:
-                    region = None
+                region = tuple( [value for value in map( float, region.split( "," ))] )
 
             art.append( ArtRecord( id,
                                    photo_id,
@@ -670,10 +684,9 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
             photo_node.attrib["filename"]         = photo["filename"]
             photo_node.attrib["id"]               = str( photo["id"] )
 
+            # don't write out a location attribute if we don't have one.
             if photo["location"] is not None:
                 photo_node.attrib["location"]     = ", ".join( map( str, photo["location"] ) )
-            else:
-                photo_node.attrib["location"]     = ""
 
             photo_node.attrib["modified_time"]    = str( photo["modified_time"] )
             photo_node.attrib["processing_state"] = photo["state"]
@@ -716,10 +729,9 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
             art_node.attrib["processing_state"] = art["state"]
             art_node.attrib["quality"]          = art["quality"]
 
+            # don't write out a region attribute if we don't have one.
             if art["region"] is not None:
                 art_node.attrib["region"]       = ", ".join( map( str, art["region"] ) )
-            else:
-                art_node.attrib["region"]       = ""
 
             art_node.attrib["size"]             = art["size"]
             art_node.attrib["tags"]             = ", ".join( art["tags"] )
