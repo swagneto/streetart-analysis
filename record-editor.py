@@ -45,6 +45,7 @@ from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
                               QTreeView, QVBoxLayout )
 
 import GraffitiAnalysis.database as grafdb
+import GraffitiAnalysis.utility as grafutil
 import GraffitiAnalysis.widgets as grafwidgets
 
 def get_exif_timestamp( file_name ):
@@ -70,15 +71,7 @@ def get_exif_timestamp( file_name ):
     exif_data = piexif.load( file_name )
     exif_str  = exif_data["0th"][piexif.ImageIFD.DateTime].decode( "utf-8" )
 
-    # convert "YYYY:MM:DD hh:mm:ss" into a tuple that we can pass to
-    # time.mktime().
-    exif_date, exif_time = (map( lambda x: x.split( ":" ), exif_str.split() ))
-    exif_date            = tuple( map( int, exif_date ) )
-    exif_time            = tuple( map( int, exif_time ) )
-
-    # note that we don't have the day of year/month information.  we also
-    # want a non-DST timestamp.
-    return time.mktime( (*exif_date, *exif_time, 0, 0, 0) )
+    return grafutil.datetime_string_to_timestamp( exif_str, ":", ":" )
 
 class RecordWindow( QMainWindow ):
     def __init__( self, window_size=None, close_callback=None ):
