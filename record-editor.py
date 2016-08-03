@@ -55,7 +55,7 @@ import time
 
 from PyQt5.QtCore import ( Qt, QItemSelectionModel, QRect, QRegExp, QSize,
                            QSortFilterProxyModel, QStringListModel )
-from PyQt5.QtGui import QImage, QPalette, QPixmap, QStandardItemModel
+from PyQt5.QtGui import QImage, QPalette, QPixmap, QStandardItemModel, QTransform
 from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
                               QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
                               QHeaderView, QLabel, QLineEdit, QListView,
@@ -288,6 +288,11 @@ class PhotoRecordViewer( RecordWindow ):
         # map keeping track of the open photo editor windows.  each photo
         # record can only be edited by one window at a time.
         self.photo_record_editors = dict()
+
+        # QLabel containing the currently previewed pixmap.  we keep what we
+        # loaded so we have the original rather than a scaled copy stored
+        # within the photoPreview widget.
+        self.preview_pixmap = None
 
         # XXX: specify a callback to save the database.
         super().__init__( (800, 600), None )
@@ -688,10 +693,9 @@ class PhotoRecordViewer( RecordWindow ):
                 # ... and cleanup our state when finished editing.
                 close_callback = partial( self.remove_photo_editor, photo_id )
 
-                # XXX: there is a better way to pass the photo in.
                 self.photo_record_editors[photo_id] = PhotoRecordEditor( self.db,
                                                                          photo,
-                                                                         get_pixmap_from_image( photo["filename"] ),
+                                                                         self.preview_pixmap,
                                                                          close_callback,
                                                                          commit_callback )
                 self.photo_record_editors[photo_id].show()
@@ -739,6 +743,19 @@ class PhotoRecordViewer( RecordWindow ):
                     try:
                         pixmap    = get_pixmap_from_image( photo["filename"] )
                         exif_time = get_exif_timestamp( photo["filename"] )
+
+                        # orient our picture to be right-side up if need be.
+                        #
+                        # NOTE: this can cause the window to resize because a 4:3
+                        #       picture rotated 90 degrees will become 3:4 which will
+                        #       be scaled to fit within the original 4:3 frame.
+                        #
+                        if photo["rotation"] != 0:
+                            rotation_matrix = QTransform()
+                            rotation_matrix.rotate( 360 - photo["rotation"] )
+
+                            pixmap = pixmap.transformed( rotation_matrix )
+
                     except:
                         exif_time = 0
                 else:
@@ -762,8 +779,10 @@ class PhotoRecordViewer( RecordWindow ):
 
                     record_count += 1
 
-                # set a preview photo.
-                self.photoPreview.setPixmap( pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
+                # keep track of the current pixmap and scale it for our
+                # preview.
+                self.preview_pixmap = pixmap
+                self.photoPreview.setPixmap( self.preview_pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
 
                 # update the labels.
                 self.infoStateLabel.setText( photo["state"] )
@@ -1544,7 +1563,7 @@ class ArtRecordEditor( RecordEditor ):
         """
 
         # create a preview of this record's photo.
-        self.photoPreview = grafwidgets.RubberBandedPixmap( self.photo_record["filename"],
+        self.photoPreview = grafwidgets.RubberBandedPixmap( self.preview_pixmap,
                                                             (600, 450) )
         self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
 
