@@ -2,31 +2,15 @@
 
 # Broken:
 #
-#   * Saving a photo record explodes (singleton helper change in get_photo_record())
-#   * X'ing out of art record editor doesn't do the cleanup?
-#   x focus needs to be on the treeview initially
-#   * description label for information
-#   * default rubberband box is too big in art editor
-#   * Windows with rubberbands need to have the appropriate widgets' sizes
-#     fixed so the regions are properly displayed (or rubberbands need to be
-#     slaved to their parents to be resized properly [HARD])
-#
 # Technical debt:
 #
 #   * factor out the code in PhotoRecordViewer.__init__()
 #      - need constants for the treeview columns
-#   * factor out the rubberband overlay setup code in refresh_art_record()
-#   * Pixmap passed from PhotoRecordViewer to PhotoRecordEditor needs to be
-#     the held reference rather than a new one.  Update the widgets to take
-#     either a filename or an existing pixmap.
 #
 # Functionality:
 #
 #   ArtRecordEditor:
 #
-#     * Population of window with ArtRecord's contents
-#     * New record creation
-#     * Record deletion
 #     * Commiting a record needs to update the status indicating it happend
 #
 #   PhotoRecordEditor:
@@ -35,12 +19,9 @@
 #
 # Features:
 #
-#     * Indicator which region is associated with a given record (given it appears
-#       hard-coded on Linux)
 #
 # UI Nits:
 #
-#   * tab order for ArtRecordEditor.
 #   * sort the contents of the TreeView()'s
 #   * [IN PROGRESS] tree view columns need to be sized properly
 #   * relative sizing of stats box labels needs to be sized properly (and not
