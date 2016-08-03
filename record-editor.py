@@ -273,13 +273,16 @@ class PhotoRecordViewer( RecordWindow ):
     """
     """
 
-    def __init__( self ):
+    def __init__( self, database_file_name=None ):
         """
         XXX
         """
 
+        if database_file_name is None:
+            database_file_name = "database.xml"
+
         # set the state for the window.
-        self.db     = grafdb.Database( "database.xml" )
+        self.db     = grafdb.Database( database_file_name )
         self.photos = self.db.get_photo_records()
 
         # map keeping track of the open photo editor windows.  each photo
@@ -1829,6 +1832,13 @@ if __name__ == '__main__':
     import sys
 
     app = QApplication( sys.argv )
-    photo_record_editor = PhotoRecordViewer()
+
+    # use a specific database if one was provided on the command line.
+    if len( sys.argv ) > 1:
+        database_file_name = sys.argv[1]
+    else:
+        database_file_name = None
+
+    photo_record_editor = PhotoRecordViewer( database_file_name )
     photo_record_editor.show()
     sys.exit( app.exec_() )
