@@ -1689,54 +1689,64 @@ class ArtRecordEditor( RecordEditor ):
         editing_layout.addWidget( QLabel( "{:d}".format( self.record["id"] ) ),
                                   0, 1 )
 
+        # 1st
         editing_layout.addWidget( self.artTypeComboLabel,
                                   1, 0 )
         editing_layout.addWidget( self.artTypeComboBox,
                                   1, 1 )
 
+        # 2nd
         editing_layout.addWidget( self.artSizeComboLabel,
                                   2, 0 )
         editing_layout.addWidget( self.artSizeComboBox,
                                   2, 1 )
 
+        # 3rd
         editing_layout.addWidget( self.artQualityComboLabel,
                                   3, 0 )
         editing_layout.addWidget( self.artQualityComboBox,
                                   3, 1 )
 
-        editing_layout.addWidget( self.artDateLabel,
+        # 4th
+        editing_layout.addWidget( self.artProcessingStateComboLabel,
                                   4, 0 )
-        editing_layout.addWidget( self.artDateLineEdit,
+        editing_layout.addWidget( self.artProcessingStateComboBox,
                                   4, 1 )
 
-        editing_layout.addWidget( self.artProcessingStateComboLabel,
-                                  5, 0 )
-        editing_layout.addWidget( self.artProcessingStateComboBox,
-                                  5, 1 )
-
+        # 5th
         editing_layout.addWidget( self.artArtistsListLabel,
                                   0, 3 )
         editing_layout.addWidget( self.artArtistsListView,
                                   1, 3,
                                   4, 1 )
 
+        # 6th
         editing_layout.addWidget( self.artAssociatesListLabel,
                                   0, 5 )
         editing_layout.addWidget( self.artAssociatesListView,
                                   1, 5,
                                   4, 1 )
 
+        # 7th
         editing_layout.addWidget( self.artVandalsListLabel,
                                   0, 7 )
         editing_layout.addWidget( self.artVandalsListView,
                                   1, 7,
                                   4, 1 )
 
+        # 8th
         editing_layout.addWidget( self.artTagsLabel,
                                   6, 0 )
         editing_layout.addWidget( self.artTagsLineEdit,
                                   6, 1,
                                   1, 7 )
+
+        # 9th
+        editing_layout.addWidget( self.artDateLabel,
+                                  5, 0 )
+        editing_layout.addWidget( self.artDateLineEdit,
+                                  5, 1 )
+
 
         editing_box = QGroupBox()
         editing_box.setLayout( editing_layout )
