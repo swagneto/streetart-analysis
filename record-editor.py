@@ -1173,6 +1173,10 @@ class PhotoRecordEditor( RecordEditor ):
         # select the first entry so we can use the keyboard for navigation.
         self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, 0 ) )
 
+        # set the processing state combination box to this record's state.
+        combo_index = self.photoProcessingStateComboBox.findText( self.record["state"] )
+        self.photoProcessingStateComboBox.setCurrentIndex( combo_index )
+
     def commit_record( self, update_photo_state=True ):
         """
         Updates the PhotoRecordEditor's internal record with user selected
