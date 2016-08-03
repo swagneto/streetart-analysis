@@ -1571,29 +1571,34 @@ class ArtRecordEditor( RecordEditor ):
                                                             (600, 450) )
         self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
 
-        # overlay the interactive rubberband box to se
+        pixmap_size = self.photoPreview.pixmap().size()
+
+        # overlay the interactive rubberband box.
         if self.record["region"] is not None:
+            # use an existing region.
             normalized_geometry = self.record["region"]
-
-            pixmap_size = self.photoPreview.pixmap().size()
-
-            # map our normalized geometry to our pixmap's dimensions.
-            geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
-                              round( normalized_geometry[1] * pixmap_size.height() ),
-                              round( normalized_geometry[2] * pixmap_size.width() ),
-                              round( normalized_geometry[3] * pixmap_size.height() ) )
-
-            # XXX: abusing the interface
-            self.photoPreview.banded_region.setGeometry( geometry )
         else:
-            # start the rubberband region covering the entirety of the photo.
-            # this provides a sensible default if the user doesn't change it
-            # before commiting the record.
-            band_thickness = 4
+            # create a new region that spans the entirety of the photo.
+            #
+            # NOTE: we fake a normalized geometry that starts a single pixel
+            #       into the pixmap runs the entirety of both dimensions.
+            #
+            width_offset  = 1 / pixmap_size.width()
+            height_offset = 1 / pixmap_size.height()
 
-            # XXX: abusing the interface
-            self.photoPreview.banded_region.resize( self.photoPreview.geometry().width() - band_thickness,
-                                                    self.photoPreview.geometry().height() - band_thickness )
+            normalized_geometry = [width_offset,
+                                   height_offset,
+                                   1.0,
+                                   1.0]
+
+        # map our normalized geometry to our pixmap's dimensions.
+        geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
+                          round( normalized_geometry[1] * pixmap_size.height() ),
+                          round( normalized_geometry[2] * pixmap_size.width() ),
+                          round( normalized_geometry[3] * pixmap_size.height() ) )
+
+        # XXX: abusing the interface
+        self.photoPreview.banded_region.setGeometry( geometry )
 
         # create the combination boxes/line edits and their associated labels
         # that let the user edit this record.
