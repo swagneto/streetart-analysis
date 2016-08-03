@@ -72,7 +72,10 @@ with open( files_list_filename, "rt" ) as f:
     files_list_string = f.read()
 
     # get a stripped, sorted list of photos to insert into the database.
-    files_list        = list( map( lambda x: x.strip(), files_list_string.split() ) )
+    # ignore the last entry since it's empty - it's a by product of splitting
+    # on new lines.
+    files_list        = list( map( lambda x: x.strip(),
+                                   files_list_string.split( "\n" ) ) )[:-1]
     files_list.sort()
 
     # XXX: check for duplicates.
