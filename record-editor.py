@@ -50,6 +50,7 @@
 
 from functools import lru_cache, partial
 import os
+import subprocess
 import time
 
 from PyQt5.QtCore import ( Qt, QItemSelectionModel, QRect, QRegExp, QSize,
@@ -1119,14 +1120,21 @@ class PhotoRecordEditor( RecordEditor ):
         Returns nothing.
         """
 
-        self.closeAct = QAction( "&Close", self, shortcut="Ctrl+W",
+        self.closeAct = QAction( "&Close Window", self, shortcut="Ctrl+W",
                                  triggered=self.close )
 
-        self.commitAct = QAction( "&Commit", self, shortcut="Ctrl+S",
+        self.commitAct = QAction( "&Commit Photo Record", self, shortcut="Ctrl+S",
                                   triggered=lambda: self.commit_record( update_photo_state=True ) )
+
+        self.editAct = QAction( "&Edit Image", self, shortcut="Ctrl+E",
+                                triggered=self.run_image_editor )
+        self.viewAct = QAction( "&View Image", self, shortcut="Ctrl+V",
+                                triggered=self.run_image_viewer )
 
         self.windowMenu = QMenu( "&Window", self )
         self.windowMenu.addAction( self.commitAct )
+        self.windowMenu.addAction( self.editAct )
+        self.windowMenu.addAction( self.viewAct )
         self.windowMenu.addAction( self.closeAct )
 
         self.menuBar().addMenu( self.windowMenu )
@@ -1455,6 +1463,40 @@ class PhotoRecordEditor( RecordEditor ):
         event.accept()
 
         super().closeEvent( event )
+
+    def run_image_viewer( self ):
+        """
+        Runs an image viewer on the record's associated image.  The viewer is
+        started asynchronously and is not tracked in any way.
+
+        NOTE: This is currently hardcoded to use feh for image viewing and
+              cannot be configured.
+
+        Takes no arguments.
+
+        Returns nothing.
+
+        """
+
+        # XXX: hardcoded program name and image size.
+        subprocess.Popen( ["feh", "-dZ", "-g", "800x600", self.record["filename"]] )
+
+    def run_image_editor( self ):
+        """
+        Runs an image editor on the record's associated image.  The editor is
+        started asynchronously and is not tracked in any way.
+
+        NOTE: This is currently hardcoded to use GIMP for image manipulation
+              and cannot be configured.
+
+        Takes no arguments.
+
+        Returns nothing.
+
+        """
+
+        # XXX: hardcoded program name and image size.
+        subprocess.Popen( ["gimp", "-adfs", self.record["filename"]] )
 
 class ArtRecordEditor( RecordEditor ):
     """
