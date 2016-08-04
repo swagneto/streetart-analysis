@@ -45,33 +45,7 @@ from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
                               QTreeView, QVBoxLayout )
 
 import GraffitiAnalysis.database as grafdb
-import GraffitiAnalysis.utility as grafutil
 import GraffitiAnalysis.widgets as grafwidgets
-
-def get_exif_timestamp( file_name ):
-    """
-    Extracts the creation time from a file containing Exif metadata and
-    returns it as seconds since the Epoch.  The 0th IFD's DateTime field is
-    used for the creation time.
-
-    Raises ValueError if the specified file's Exif metadata cannot be parsed.
-
-    Takes 1 argument:
-
-      file_name - Path to the file to extract the timestamp from.
-
-    Returns 1 value:
-
-      timestamp - Seconds since the Epoch when the file was created.
-
-    """
-
-    import piexif
-
-    exif_data = piexif.load( file_name )
-    exif_str  = exif_data["0th"][piexif.ImageIFD.DateTime].decode( "utf-8" )
-
-    return grafutil.datetime_string_to_timestamp( exif_str, ":", ":" )
 
 class RecordWindow( QMainWindow ):
     def __init__( self, window_size=None, close_callback=None ):
@@ -714,27 +688,23 @@ class PhotoRecordViewer( RecordWindow ):
                 #      but needs to be handled during insert into the database.
                 #
                 if os.path.isfile( photo["filename"] ):
-                    try:
-                        pixmap    = get_pixmap_from_image( photo["filename"] )
-                        exif_time = get_exif_timestamp( photo["filename"] )
+                    pixmap = get_pixmap_from_image( photo["filename"] )
 
-                        # orient our picture to be right-side up if need be.
-                        #
-                        # NOTE: this can cause the window to resize because a 4:3
-                        #       picture rotated 90 degrees will become 3:4 which will
-                        #       be scaled to fit within the original 4:3 frame.
-                        #
-                        if photo["rotation"] != 0:
-                            rotation_matrix = QTransform()
-                            rotation_matrix.rotate( 360 - photo["rotation"] )
+                    # orient our picture to be right-side up if need be.
+                    #
+                    # NOTE: this can cause the window to resize because a 4:3
+                    #       picture rotated 90 degrees will become 3:4 which will
+                    #       be scaled to fit within the original 4:3 frame.
+                    #
+                    if photo["rotation"] != 0:
+                        rotation_matrix = QTransform()
+                        rotation_matrix.rotate( 360 - photo["rotation"] )
 
-                            pixmap = pixmap.transformed( rotation_matrix )
-
-                    except:
-                        exif_time = 0
+                        pixmap = pixmap.transformed( rotation_matrix )
                 else:
                     pixmap    = QPixmap()
-                    exif_time = 0
+
+                exif_time = photo["photo_time"]
 
                 # count the number of child art records in each of the
                 # processing states.

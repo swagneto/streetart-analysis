@@ -214,13 +214,14 @@ def _read_xml_database( filename ):
             # these are our mandatory arguments for building a PhotoRecord...
             id            = int( attributes.pop( "id", None ) )
             filename      = attributes.pop( "filename", None )
-            resolution    = attributes.pop( "resolution", None )
 
             # ... and these are the optional ones.
             state         = attributes.pop( "processing_state", "unreviewed" )  # name change.
             created_time  = float( attributes.pop( "created_time", "0.0" ) )
             modified_time = float( attributes.pop( "modified_time", "0.0" ) )
             location      = attributes.pop( "location", None )
+            photo_time    = float( attributes.pop( "photo_time", "0.0" ) )
+            resolution    = attributes.pop( "resolution", None )
             rotation      = int( attributes.pop( "rotation", "0" ) )
             tags          = attributes.pop( "tags", "" )
 
@@ -228,7 +229,11 @@ def _read_xml_database( filename ):
             # representations.  resolutions are specified as "NxM" and
             # locations as "X, Y".  tags is a comma delimited list of
             # strings.
-            resolution = [size for size in map( int, resolution.split( "x" ) )]
+            if resolution is not None:
+                if resolution == "":
+                    resolution = None
+                else:
+                    resolution = [size for size in map( int, resolution.split( "x" ) )]
 
             if tags == "":
                 tags = []
@@ -248,10 +253,11 @@ def _read_xml_database( filename ):
             #
             photos.append( PhotoRecord( id,
                                         filename,
-                                        resolution,
                                         created_time=created_time,
                                         location=location,
                                         modified_time=modified_time,
+                                        photo_time=photo_time,
+                                        resolution=resolution,
                                         rotation=rotation,
                                         state=state,
                                         tags=tags,
@@ -689,6 +695,7 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
                 photo_node.attrib["location"]     = ", ".join( map( str, photo["location"] ) )
 
             photo_node.attrib["modified_time"]    = str( photo["modified_time"] )
+            photo_node.attrib["photo_time"]       = str( photo["photo_time"] )
             photo_node.attrib["processing_state"] = photo["state"]
             photo_node.attrib["resolution"]       = "x".join( map( str, photo["resolution"] ) )
             photo_node.attrib["rotation"]         = str( photo["rotation"] )
@@ -976,17 +983,18 @@ class PhotoRecord( Record ):
     XXX: constants here need to be consistent but different than the database
     """
 
-    def __init__( self, id, filename, resolution, state=None, location=None, rotation=0, created_time=None, modified_time=None, tags=None ):
+    def __init__( self, id, filename, resolution=None, state=None, location=None, rotation=0, created_time=None, modified_time=None, photo_time=None, tags=None ):
         """
         Constructs an PhotoRecord object from the supplied parameters.
 
-        Takes 9 arguments:
+        Takes 10 arguments:
 
           id            - Identifier for the photo record.  Must be a positive
                           integer, different from other record identifiers.
           filename      - Path to the photograph file on disk.
-          resolution    - Tuple of positive integers specifying the (width, height)
-                          of the photograph.
+          resolution    - Optional tuple of positive integers specifying the
+                          (width, height) of the photograph.  If omitted, defaults
+                          to (0, 0).
           state         - Optional string specifying the processing state of the
                           record.  If omitted, defaults to "unreviewed".
           location      - Tuple of fractional (latitude, longitude) with positive
@@ -999,9 +1007,12 @@ class PhotoRecord( Record ):
                           photograph) was created.  If omitted, defaults to
                           the current time.
           modified_time - Optional fractional seconds since the Epoch
-                          indicating when the art record (not the photograph)
+                          indicating when the photo record (not the photograph)
                           was last modified.  If omitted, defaults to the
                           current time.
+          photo_time    - Optional fractional seconds since the Epoch
+                          indicating when the photograph was taken.  If
+                          omitted, defaults to the Epoch.
           tags          - Optional, possibly empty, list of strings specifying
                           tas associated with the photograph.  If omitted,
                           defaults to an empty list.
@@ -1015,19 +1026,26 @@ class PhotoRecord( Record ):
         if state is None:
             state = "unreviewed"
 
+        if resolution is None:
+            resolution = (0, 0)
+
         if created_time is None:
             created_time = time.mktime( time.gmtime() )
 
         if modified_time is None:
             modified_time = created_time
 
+        if photo_time is None:
+            photo_time = 0
+
         # XXX: should these lists be somewhere else?
         _readable_keys = ["created_time", "filename", "id", "location",
-                          "modified_time", "resolution", "rotation", "state", "tags"]
-        _mutable_keys   = ["filename", "modified_time", "state", "tags"]
+                          "modified_time", "photo_time", "resolution",
+                          "rotation", "state", "tags"]
+        _mutable_keys  = ["location", "modified_time", "photo_time",
+                          "resolution", "rotation", "state", "tags"]
 
-        resolution = (4112, 3884)
-        tags       = []
+        tags           = []
 
         super().__init__( _readable_keys,
                           _mutable_keys,
@@ -1036,6 +1054,7 @@ class PhotoRecord( Record ):
                           id=id,
                           location=location,
                           modified_time=modified_time,
+                          photo_time=photo_time,
                           resolution=resolution,
                           rotation=rotation,
                           state=state,
@@ -1182,7 +1201,7 @@ class Database( object ):
 
         return requested_photos
 
-    def new_photo_record( self, file_name, resolution ):
+    def new_photo_record( self, file_name, **kwargs ):
         """
         Inserts a new photo record for the supplied file into the database.
         Aside from the resolution, default values are used for the record's
@@ -1190,9 +1209,9 @@ class Database( object ):
 
         Takes 2 arguments:
 
-          file_name  - Path to the photo on disk.
-          resolution - Tuple specifying the dimensions of the photo.  This
-                       must be a pair of positive integers.
+          file_name - Path to the photo on disk.
+          kwargs    - Optional keyword arguments containing the key/value
+                      pairs to initialize the PhotoRecord with.
 
         Returns 1 value:
 
@@ -1203,7 +1222,9 @@ class Database( object ):
         # compute a unique index that hasn't been used yet.
         photo_id = max( [photo["id"] for photo in self.photos] ) + 1
 
-        self.photos.append( PhotoRecord( photo_id, file_name, resolution ) )
+        self.photos.append( PhotoRecord( photo_id,
+                                         file_name,
+                                         **kwargs ) )
 
         self.mark_data_dirty()
 

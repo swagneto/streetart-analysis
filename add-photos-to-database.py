@@ -11,6 +11,7 @@
 import sys
 
 import GraffitiAnalysis.database as grafdb
+import GraffitiAnalysis.utility as grafutil
 
 import piexif
 
@@ -91,24 +92,30 @@ for photo in photos:
     known_files[photo["filename"]] = photo
 
 for file_name in files_list:
-    # parse the Exif data for this file.
-    # XXX: handle the case where no Exif data exists.
-    exif_data  = piexif.load( file_name )
+    fields = dict()
 
-    rotation   = orientation_to_rotation( exif_data["0th"][piexif.ImageIFD.Orientation] )
-    resolution = (exif_data["Exif"][piexif.ExifIFD.PixelXDimension],
-                  exif_data["Exif"][piexif.ExifIFD.PixelYDimension])
+    # parse the Exif data for this file.  set some (not so) suitable defaults
+    # when we can't get Exif data.
+    try:
+        exif_data  = piexif.load( file_name )
+
+        fields["rotation"]   = orientation_to_rotation( exif_data["0th"][piexif.ImageIFD.Orientation] )
+        fields["resolution"] = (exif_data["Exif"][piexif.ExifIFD.PixelXDimension],
+                                exif_data["Exif"][piexif.ExifIFD.PixelYDimension])
+        fields["photo_time"] = grafutil.datetime_string_to_timestamp( exif_data["Exif"][piexif.ExifIFD.DateTimeOriginal].decode( "utf-8" ),
+                                                                      ":", ":" )
+    except:
+        fields["rotation"]   = 0
+        fields["resolution"] = (0, 0)
+        fields["photo_time"] = 0
 
     if file_name in known_files:
-        # NOTE: we can't update the resolution of an existing record.
-        photo = known_files[file_name]
-    else:
-        photo = db.new_photo_record( file_name, resolution )
+        print( "'{:s}' already exists in the database, skipping.".format( file_name ) )
+        continue
 
-    if photo["rotation"] != rotation:
-        photo["rotation"] = rotation
+    photo = db.new_photo_record( file_name, **fields )
 
-        db.mark_data_dirty()
+    db.mark_data_dirty()
 
 # only update the database if we made changes.
 if db.are_data_dirty():
