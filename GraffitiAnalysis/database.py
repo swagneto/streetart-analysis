@@ -1201,6 +1201,40 @@ class Database( object ):
 
         return requested_photos
 
+    def get_photo_records_by_time( self, start_time=None, end_time=None ):
+        """
+        Retrieves PhotoRecords in the database whose photo was taken within
+        the supplied time window.
+
+        Takes 2 arguments:
+
+          start_time - Optional start time for the window.  If omitted,
+                       defaults to the timestamp for the oldest photo in the
+                       database.
+          end_time   - Optional end time for the window.  If omitted,
+                       defaults to the timestamp for the youngest photo in the
+                       database.
+
+        Returns 1 value:
+
+          photos - A list of PhotoRecord's matching the requested time window.
+
+        """
+
+        # if the user hasn't requested a specific time period, return
+        # everything we have.
+        if start_time is None and end_time is None:
+            return self.photos
+
+        # fill in the missing boundary.
+        if start_time is None:
+            start_time = min( [photo["photo_time"] for photo in self.photos] )
+        elif end_time is None:
+            end_time = max( [photo["photo_time"] for photo in self.photos] )
+
+        # find all of the photos that are in the time frame requested.
+        return [photo for photo in self.photos if start_time <= photo["photo_time"] <= end_time]
+
     def new_photo_record( self, file_name, **kwargs ):
         """
         Inserts a new photo record for the supplied file into the database.
