@@ -1,4 +1,4 @@
-import time
+import calendar
 
 def datetime_string_to_timestamp( string, date_separator="/", time_separator=":" ):
     """
@@ -31,7 +31,7 @@ def datetime_string_to_timestamp( string, date_separator="/", time_separator=":"
 
         # note that we don't have the day of year/month information.  we also
         # want a non-DST timestamp.
-        seconds = time.mktime( (*date_tuple, *time_tuple, 0, 0, 0) )
+        seconds = calendar.timegm( (*date_tuple, *time_tuple, 0, 0, 0) )
     except:
         seconds = 0
 
