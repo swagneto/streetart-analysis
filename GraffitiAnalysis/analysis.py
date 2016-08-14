@@ -124,3 +124,115 @@ def arts_to_dataframe( arts, photos_df=None ):
     return pd.DataFrame.from_records( art_tuples,
                                       index="id",
                                       columns=art_columns )
+
+def gpx_to_dataframe( gpxs ):
+    """
+    Converts a list of GPX objects into a pair of Pandas DataFrames, one
+    representing a concatenated track and the other all of the reported
+    waypoints.  Both DataFrames are indexed by the track points' UTC
+    timestamps.
+
+    NOTE: Only the first track's first segment is used to create the
+          DataFrame.
+
+    NOTE: The original GPX objects are not referenced in the generated
+          DataFrame since it unclear what would be most useful to capture.
+
+    Takes 1 argument:
+
+      gpxs - A list of GPX objects whose first track segments are converted
+             into DataFrames.  A single GPX object may be supplied as a
+             scalar as a convenience instead of creating a list out of it.
+
+    Returns 2 values:
+
+      tracks_dfs    - DataFrame representing the concatenated track.
+      waypoints_dfs - DataFrame representing the waypoints.
+
+    """
+
+    track_columns = ["longitude",
+                     "latitude",
+                     "altitude",
+                     "course",
+                     "computed_speed",
+                     "reported_speed",
+                     "satellites",
+                     "source",
+                     "geoid_height",
+                     "symbol",
+                     "gpx_fix_type",
+                     "hdop",
+                     "vdop",
+                     "pdop"]
+
+    # our GPX data source doesn't populate much for waypoints, so we don't
+    # bother creating useless columns.
+    waypoint_columns = ["name",
+                        "longitude",
+                        "latitude",
+                        "altitude",
+                        "source"]
+
+    tracks_df    = pd.DataFrame( [], columns=track_columns )
+    waypoints_df = pd.DataFrame( [], columns=waypoint_columns )
+
+    # help the user in a common use case by creating the list for them.
+    if type( gpxs ) != list:
+        gpxs = [gpxs]
+
+    # walk through each GPX object creating new DataFrames and appending them
+    # to the existing DataFrames.
+    for gpx in gpxs:
+        # XXX: assumes we only have a single track with a single segment in it.
+
+        track_data = []
+        times      = []
+        for (point_index, point) in enumerate( gpx.tracks[0].segments[0].points ):
+            track_data.append( [point.longitude,
+                                point.latitude,
+                                point.elevation,
+                                point.course,
+                                gpx.tracks[0].segments[0].get_speed( point_index ),
+                                point.speed,
+                                point.satellites,
+                                point.source,
+                                point.geoid_height,
+                                point.symbol,
+                                point.type_of_gpx_fix,
+                                point.horizontal_dilution,
+                                point.vertical_dilution,
+                                point.position_dilution] )
+            times.append( pd.Timestamp( point.time ) )
+
+        # convert this track into a data frame and store it.
+        tracks_df = pd.concat( [tracks_df,
+                                pd.DataFrame( track_data,
+                                              index=times,
+                                              columns=track_columns )] )
+
+        waypoint_data = []
+        times         = []
+        for (point_index, point) in enumerate( gpx.waypoints ):
+            waypoint_data.append( [point.name,
+                                   point.longitude,
+                                   point.latitude,
+                                   point.elevation,
+                                   point.source] )
+            times.append( pd.Timestamp( point.time ) )
+
+        # convert this track into a data frame and store it.
+        waypoints_df = pd.concat( [waypoints_df,
+                                   pd.DataFrame( waypoint_data,
+                                                 index=times,
+                                                 columns=waypoint_columns )] )
+
+    # work around gpxpy's speed computation for first points in a track.
+    null_indices = tracks_df["computed_speed"].isnull()
+    tracks_df.loc[null_indices, "computed_speed"] = 0.0
+
+    # explicitly label our times as UTC as that's what is stored in GPX.
+    tracks_df.tz_localize( "UTC", copy=False )
+    waypoints_df.tz_localize( "UTC", copy=False )
+
+    return (tracks_df, waypoints_df)

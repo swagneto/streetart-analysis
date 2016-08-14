@@ -336,3 +336,209 @@ def create_photo_markers( photo_df, group, popup_html=None, popup_dimensions=Non
         group.add_child( marker )
 
     return group
+
+def create_track( track_df, group, popup_html=None, popup_dimensions=None, track_properties=None, marker_properties=None ):
+    """
+    Creates a Folium track and markers for each track point in the supplied
+    DataFrame.  Both the track and markers are added into a supplied
+    folium.FeatureGroup or into a newly created one if a name is supplied
+    instead.  The caller has full control over each marker's popup by
+    supplying a HTML template that is instantiated from the supplied
+    DataFrame's contents.  Control over the markers appearance is available as
+    well.
+
+    The popup's template will have the following keyword parameters substituted
+    during instantiation:
+
+      altitude       - Altitude of the point in meters.
+      course         - Fractional degrees, in [0, 360), specifying the
+                       course when the point was recorded.  May be NaN if
+                       the course is unknown.
+      computed_speed - Computed speed, in meters per second, based on
+                       neighboring points.
+      hdop           - Horizontal dilution of position (HDOP) in the range of
+                       (0, oo).
+      latitude       - Latitude of a point, in fractional degrees.
+      latitude_ref   - "N" or "S" if the point is in the northern or southern
+                       hemisphere, respectively.
+      longitude      - Longitude of the point, in fractional degrees.
+      longitude_ref  - "E" or "W" if the point is in the eastern or
+                       western hemisphere, respectively.
+      pdop           - Position dilution (PDOP) in the range of (0, oo).
+      point_index    - Zero-based index of the point within the supplied
+                       track DataFrame.  In the range of [0, len( track_df )).
+      source         - String specifying the source of the track point.
+                       Usually something along the lines of "gps" or "network".
+      speed          - Reported speed, in meters per second, when the track
+                       point was recorded.
+      time_seconds   - Fractional seconds since the Epoch when the track point
+                       was recorded.
+      time_string    - Human-readable string of the track point's time.
+      vdop           - Vertical dilution of position (VDOP) in the range of
+                       (0, oo).
+
+    The track_properties dictionary must contain the following keys:
+
+      color   - The track's color.  String suitable for use with
+                folium.MultiPolyLine().
+      weight  - The track's width.  Must be positive.
+      opacity - The marker's opacity value in the range of [0.0, 1.0].
+
+    The marker_properties dictionary must contain the following keys:
+
+      color        - The marker's border color.  String suitable for use with
+                     folium.CircleMarker().
+      fill_color   - The marker's interior color.  String suitable for use with
+                     folium.CircleMarker().
+      fill_opacity - The marker's opacity value in the range of [0.0, 1.0].
+      radius       - The marker's radius.  Must be positive.
+
+    Takes 6 arguments:
+
+      track_df          - DataFrame for the track to create markers for.
+      group             - Name of the FeatureGroup to create, or an existing
+                          FeatureGroup, to add markers into.
+      popup_html        - Optional HTML template to use for markers created.
+                          If omitted, defaults to a simple popup that shows
+                          a clickable thumbnail of the photo and basic vitals
+                          of its record.
+      popup_dimensions  - Optional pair tuple specifying the size of each
+                          marker's popup.  If omitted, it is sized according
+                          to the default popup_html.
+      track_properties  - Optional dictionary whose contents govern created
+                          tracks's properties.  See above for details.
+      marker_properties - Optional dictionary whose contents govern created
+                          marker's properties.  See above for details.
+
+    Returns 1 value:
+
+      group - The FeatureGroup populated with the created line and markers.
+
+    """
+
+    # default to a small, blue line that provides contrast against may base
+    # layers.
+    if track_properties is None:
+        track_properties = { "color":   "blue",
+                             "opacity": 1.0,
+                             "weight":  2.0 }
+
+    # default to a simple, small marker that provides contrast against many
+    # base layers.
+    if marker_properties is None:
+        marker_properties = { "color":        "purple",
+                              "fill_color":   "purple",
+                              "fill_opacity": 1.0,
+                              "radius":       1.0 }
+
+    if popup_dimensions is None:
+        # XXX: these defaults are weird.
+        popup_dimensions = (325, 285)
+
+    # use a default popup if the caller did not provide one.
+    if popup_html is None:
+        popup_html = """
+<link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Open+Sans" />
+
+<style>
+   .waypoint-marker
+   {{
+       font-family: "Open Sans", "Times New Roman", Georgia, Serif;
+       font-size:   9pt;
+    }}
+</style>
+
+<div class="waypoint-marker">
+    <table>
+        <tbody>
+            <tr>
+                <td>Point Index:</td>
+                <td>{point_index:d}</td>
+            </tr>
+            <tr>
+                <td>Time:</td>
+                <td>{time_string:s} ({time_seconds:.1f})</td>
+            </tr>
+            <tr>
+                <td>Location:</td>
+                <td>({latitude:8.5f}{latitude_ref:s}, {longitude:9.5f}{longitude_ref:s})</td>
+            </tr>
+            <tr>
+                <td>Posit source:</td>
+                <td>{source:s}</td>
+            </tr>
+            <tr>
+                <td>Course:</td>
+                <td>{course:.1f}</td>
+            </tr>
+            <tr>
+                <td>Speed:</td>
+                <td>{reported_speed:.2f} m/s ({computed_speed:.2f} m/s)</td>
+            </tr>
+            <tr>
+                <td>Dilution (H, V, P):</td>
+                <td>{hdop:.2f}, {vdop:.2f} {pdop:.2f}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+"""
+
+    # create a new feature group with the supplied name if we weren't handed a
+    # feature group to append to.
+    if type( group ) != folium.FeatureGroup:
+        group = folium.FeatureGroup( name=group )
+
+    # add our track to the group.  note that Folium wants a list of tuples
+    # rather than a Numpy array ~ Nx2.
+    track_line = folium.PolyLine( [(point[0], point[1]) for point in track_df[["latitude", "longitude"]].values],
+                                  **track_properties )
+    group.add_child( track_line )
+
+    # walk through each of the rows in this DataFrame and populate our
+    # dictionary that provides values to the popup template.
+    for point_index, index in enumerate( track_df.index ):
+        point_series = track_df.loc[index]
+
+        kwargs = dict()
+
+        kwargs["altitude"]       = point_series["altitude"]
+        kwargs["course"]         = point_series["course"]
+        kwargs["computed_speed"] = point_series["computed_speed"]
+
+        kwargs["hdop"]           = point_series["hdop"]
+
+        kwargs["latitude"]       = point_series["latitude"]
+        kwargs["latitude_ref"]   = "N" if kwargs["latitude"] >= 0 else "S"
+        kwargs["longitude"]      = point_series["longitude"]
+        kwargs["longitude_ref"]  = "E" if kwargs["longitude"] >= 0 else "W"
+
+        kwargs["pdop"]           = point_series["pdop"]
+        kwargs["point_index"]    = point_index
+        kwargs["reported_speed"] = point_series["reported_speed"]
+        kwargs["source"]         = point_series["source"]
+
+        kwargs["time_seconds"]   = point_series.name.timestamp()
+        kwargs["time_string"]    = time.strftime( "%Y/%m/%d %H:%M:%S %Z",
+                                                  time.gmtime( kwargs["time_seconds"] ) )
+
+        kwargs["vdop"]           = point_series["vdop"]
+
+        # instantiate the popup's template and create an IFrame to hold it.
+        iframe_html = popup_html.format( **kwargs )
+        iframe      = folium.element.IFrame( html=iframe_html,
+                                             width=popup_dimensions[0],
+                                             height=popup_dimensions[1] )
+
+        # create a marker and the popup that occurs when it is clicked.
+        #
+        # XXX: is the popup's max_width what we want?
+        #
+        popup  = folium.Popup( iframe, max_width=popup_dimensions[0] )
+        marker = folium.CircleMarker( location=tuple( point_series[["latitude", "longitude"]].values ),
+                                      popup=popup,
+                                      **marker_properties )
+
+        group.add_child( marker )
+
+    return group
