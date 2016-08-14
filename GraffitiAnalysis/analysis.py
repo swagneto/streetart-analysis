@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 # XXX: do we do something special with the timestamps in the *_to_dataframe()
