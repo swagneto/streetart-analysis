@@ -1,8 +1,60 @@
+import calendar
+
 import numpy as np
 import pandas as pd
 
 # XXX: do we do something special with the timestamps in the *_to_dataframe()
 #      routines?
+
+def correct_photo_timestamp( timestamp, remove=False ):
+    """
+    Adjusts a photo timestamp to correct for non-standard camera clocks.
+    This adjusts for known clock drift, clock misconfiguration, or clocks set to
+    non-UTC time zones.  "Removing" an adjustment is also possible to go from
+    the correct, UTC time back to the original time.
+
+    Currently this method understands and compensates for the following:
+
+       1. Pictures taken before 2016/04/20 were in UTC-5 (CST).
+       2. Pictures taken after 2016/04/20 were in UTC+1 (CEST).
+
+    Takes 2 arguments:
+
+      timestamp - The timestamp to adjust.
+      remove    - Optional flag specifying whether the adjustment should be
+                  undone.  If false, the adjustment is made, otherwise it is
+                  undone.  If omitted, defaults to False.
+
+    Returns 1 value:
+
+      timestamp - The adjusted timestamp.
+
+    """
+
+    # the one threshold we handle is sometime on 2016/04/20 the camera's time
+    # was moved from UTC-5 (CST) to UTC+1 (CEST due to misunderstanding which
+    # timezone Sarajevo is in).
+    cst_offset                 = 5 * 3600
+    threshold_20160420_tuple   = (2016, 4, 20, 0, 0, 0, 0, 0, 0)
+    threshold_20160420_seconds = calendar.timegm( threshold_20160420_tuple ) - cst_offset
+
+    # seconds to add to get us to UTC+0. before we were UTC-5 and after we
+    # were UTC+1.
+    before_20160420_offset = 5 * 3600
+    after_20160420_offset  = -3600
+
+    # if we're removing the correction, switch the signs on our offsets.
+    if remove == True:
+        before_20160420_offset *= -1
+        after_20160420_offset  *= -1
+
+    # adjust things based on the single threshold we know about.
+    if timestamp < threshold_20160420_seconds:
+        timestamp += before_20160420_offset
+    else:
+        timestamp += after_20160420_offset
+
+    return timestamp
 
 def photos_to_dataframe( photos ):
     """

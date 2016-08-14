@@ -10,6 +10,7 @@
 
 import sys
 
+import GraffitiAnalysis.analysis as grafanal
 import GraffitiAnalysis.database as grafdb
 import GraffitiAnalysis.utility as grafutil
 
@@ -57,8 +58,13 @@ for file_name in files_list:
         fields["rotation"]   = grafutil.exif_orientation_to_rotation( exif_data["0th"][piexif.ImageIFD.Orientation] )
         fields["resolution"] = (exif_data["Exif"][piexif.ExifIFD.PixelXDimension],
                                 exif_data["Exif"][piexif.ExifIFD.PixelYDimension])
+
+        # get our photo's creation time in UTC.  we correct the timestamp
+        # since the camera's time was changed in the middle of the collection.
         fields["photo_time"] = grafutil.datetime_string_to_timestamp( exif_data["Exif"][piexif.ExifIFD.DateTimeOriginal].decode( "utf-8" ),
                                                                       ":", ":" )
+        fields["photo_time"] = grafanal.correct_photo_timestamp( fields["photo_time"] )
+
     except:
         fields["rotation"]   = 0
         fields["resolution"] = (0, 0)
