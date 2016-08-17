@@ -1122,15 +1122,14 @@ class Database( object ):
         """
 
         # figure out where our backing store is.
-        if self.filename is None:
-            filename  = "memory"
-            read_func = _read_memory_database
-        else:
-            filename  = self.filename
-            read_func = _read_xml_database
+        def read_database( filename ):
+            if filename is None:
+                return _read_memory_database()
+            else:
+                return _read_xml_database( filename )
 
         # load the database.
-        self.art_fields, self.processing_states, self.photos, self.arts = read_func( filename )
+        self.art_fields, self.processing_states, self.photos, self.arts = read_database( self.filename )
 
     def save_database( self, filename=None ):
         """
