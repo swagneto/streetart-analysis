@@ -297,6 +297,7 @@ def _read_xml_database( filename ):
             art_type      = attributes.pop( "type", None )
 
             # ... and these are the optional ones.
+            date          = attributes.pop( "date", "" )
             state         = attributes.pop( "processing_state", "unreviewed" )  # name change.
             artists       = attributes.pop( "artists", "Unknown" )
             associates    = attributes.pop( "associates", "" )
@@ -336,6 +337,7 @@ def _read_xml_database( filename ):
                                    artists=artists,
                                    associates=associates,
                                    created_time=created_time,
+                                   date=date,
                                    modified_time=modified_time,
                                    region=region,
                                    state=state,
@@ -736,6 +738,10 @@ def _write_xml_database( filename, art_fields, processing_states, photos, arts )
             art_node.attrib["processing_state"] = art["state"]
             art_node.attrib["quality"]          = art["quality"]
 
+            # don't write a date attribute if we don't have one.
+            if art["date"] is not None:
+                art_node.attrib["date"]         = art["date"]
+
             # don't write out a region attribute if we don't have one.
             if art["region"] is not None:
                 art_node.attrib["region"]       = ", ".join( map( str, art["region"] ) )
@@ -853,7 +859,9 @@ class ArtRecord( Record ):
       *associates     List, possibly empty, of artists who are associated with
                       the work.
       created_time    Fractional seconds since Epoch when the record was created.
-      *date           Four digit year when the art was created.
+      *date           String representing the date whe the art was created.
+                      Typically either a four digit year or a variant of
+                      YYYY/MM/DD.
       id              Unique, positive integer identifier for the art.
       *modified_time  Fractional seconds since Epoch when the record was last
                       updated.
