@@ -5,7 +5,6 @@
 # Technical debt:
 #
 #   * factor out the code in PhotoRecordViewer.__init__()
-#      - need constants for the treeview columns
 #
 # Functionality:
 #
@@ -23,46 +22,42 @@
 # UI Nits:
 #
 #   * sort the contents of the TreeView()'s
-#   * [IN PROGRESS] tree view columns need to be sized properly
 #   * relative sizing of stats box labels needs to be sized properly (and not
 #     encroach on the selection view).
 #   * do we need to set the content margins and spacing on every widget, or does
 #     it propagate downward in a layout?
 
-from functools import lru_cache, partial
+from functools import lru_cache
 import os
 import subprocess
 import time
 
-from PyQt5.QtCore import ( Qt, QItemSelectionModel, QRect, QRegExp, QSize,
-                           QSortFilterProxyModel, QStringListModel )
-from PyQt5.QtGui import QImage, QPalette, QPixmap, QStandardItemModel, QTransform
-from PyQt5.QtWidgets import ( QAbstractItemView, QAction, QApplication,
-                              QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
-                              QHeaderView, QLabel, QLineEdit, QListView,
-                              QMainWindow, QMenu, QMessageBox, QPushButton,
-                              QRubberBand, QScrollArea, QSizePolicy, QSpacerItem,
-                              QTreeView, QVBoxLayout )
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
 import GraffitiAnalysis.database as grafdb
 import GraffitiAnalysis.widgets as grafwidgets
 
+# constant for the default role value used when accessing the data() method
+# of a QStandardItem.
+DATA_ROLE = Qt.UserRole + 1
+
 class RecordWindow( QMainWindow ):
-    def __init__( self, window_size=None, close_callback=None ):
+    DEFAULT_H_SIZE = 800
+    DEFAULT_V_SIZE = 600
+
+    def __init__( self, window_size=QSize( DEFAULT_H_SIZE, DEFAULT_V_SIZE ) ):
         """
         Constructs a RecordWindow object representing a basic window.  The
         window is not shown or explicitly positioned prior to the constructor
         returning.
 
-        Takes 2 arguments:
+        Takes 1 argument:
 
-          window_size     - Optional tuple of (width, height) in pixels
-                            specifying the RecordEditor's window's size.  If
-                            omitted, the window will be big enough to hold its
-                            contents.
-          close_callback  - Optional callback to invoke when the
-                            RecordEditor's window is closed.  If omitted,
-                            defaults to None and no callback will be invoked.
+          window_size     - Optional QSize specifying the RecordEditor's
+                            window's size.  If omitted, the window will be
+                            big enough to hold its contents.
 
         Returns 1 value:
 
@@ -71,21 +66,14 @@ class RecordWindow( QMainWindow ):
         """
         super().__init__()
 
-        self.close_callback  = close_callback
-
-        self.centralWidget   = None
+        self.centralWidget = None
+        self.window_size   = window_size
 
         self.create_models()
         self.create_widgets()
         self.create_layout()
         self.create_menus()
         self.set_state()
-
-        if self.centralWidget is not None:
-            self.setCentralWidget( self.centralWidget )
-
-        if window_size is not None:
-            self.resize( *window_size )
 
     def create_models( self ):
         """
@@ -125,7 +113,7 @@ class RecordWindow( QMainWindow ):
 
     def create_menus( self ):
         """
-        Creats the menus for a RecordWindow.
+        Creates the menus for a RecordWindow.
 
         This will be invoked after the models are created and widgets are laid
         out (see create_models(), create_widgets(), and create_layouts()).
@@ -147,49 +135,45 @@ class RecordWindow( QMainWindow ):
         Returns nothing.
         """
 
-    def closeEvent( self, event ):
+    def sizeHint( self ):
         """
-        Handles closing the window by calling the callback specified at window
-        creation.
+        Provides the recommended size for this window in a way that allows Qt
+        the final say on how large/small the actual size should be.
 
-        Takes 1 argument:
+        Returns 1 value:
 
-          event - XXX: what is this?
+          QSize - containing the suggested width and height.
 
-        Returns nothing.
         """
-
-        # run our callback if we have one.
-        if self.close_callback is not None:
-            self.close_callback()
+        return self.window_size
 
 class RecordEditor( RecordWindow ):
     """
     XXX: RecordEditor's have a record, a preview, and commit_record() method.
     """
 
-    def __init__( self, record, preview_pixmap, window_size=None, close_callback=None, commit_callback=None ):
+    # signal emitted when a RecordEditor's closeEvent is triggered.
+    closed    = pyqtSignal( int )
+
+    # signal emitted when a user triggers the commit action
+    committed = pyqtSignal( int )
+
+    def __init__( self, record, preview_pixmap, window_size=None ):
         """
         Constructs a RecordEditor object representing a record editor window.
         The window is not shown or explicitly positioned prior to the
         constructor returning.
 
-        Takes 5 arguments:
+        Takes 3 arguments:
 
           record          - Record object that will be edited by the window.
+                            Must contain an "id" field.
           preview_pixmap  - QPixmap of the photograph that the record is
                             associated with.
           window_size     - Optional tuple of (width, height) in pixels
                             specifying the RecordEditor's window's size.  If
                             omitted, the window will be big enough to hold its
                             contents.
-          close_callback  - Optional callback to invoke when the
-                            RecordEditor's window is closed.  If omitted,
-                            defaults to None and no callback will be invoked.
-          commit_callback - Optional callback to invoke when the RecordEditor
-                            has commited changes to the underlying record.  If
-                            omitted, defaults to None and no callback will be
-                            invoked.
 
         Returns 1 value:
 
@@ -199,9 +183,8 @@ class RecordEditor( RecordWindow ):
 
         self.record          = record
         self.preview_pixmap  = preview_pixmap
-        self.commit_callback = commit_callback
 
-        super().__init__( window_size, close_callback )
+        super().__init__( window_size )
 
     def commit_record( self ):
         """
@@ -212,14 +195,87 @@ class RecordEditor( RecordWindow ):
 
         Returns nothing.
         """
+        # notify any listeners of the ID of the record committed.
+        self.committed.emit( self.record["id"] )
 
-        # run our callback if we have one.
-        if self.commit_callback is not None:
-            self.commit_callback()
+    def closeEvent( self, event ):
+        """
+        Handles closing the window by calling the callback specified at window
+        creation.
+
+        Takes 1 argument:
+
+          event - QCloseEvent used to accept or reject the close event.
+
+        Returns nothing.
+        """
+        # notify any listeners that this RecordEditor has been closed.
+        self.closed.emit( self.record["id"] )
+
+# XXX: refactor into widgets.py?
+class SelectionView( QTableView ):
+    """
+
+    """
+    def __init__( self, parent=None ):
+        """
+
+        """
+        super().__init__( parent )
+
+        self.setSelectionBehavior( QAbstractItemView.SelectRows )
+        self.setSelectionMode( QAbstractItemView.SingleSelection )
+        self.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.setAlternatingRowColors( True )
+        self.verticalHeader().hide()
+        self.verticalHeader().setDefaultSectionSize( 20 )
+        self.setSortingEnabled( True )
+
+        # prevent the users from rearranging the columns.
+        self.horizontalHeader().setSectionsMovable( False )
+
+        # have the last column fill the remaining space of the table
+        # XXX: for some reason in ArtRecordViewer this doesn't take
+        #      until you manually adjust the horizontal header,
+        #      another weird QMainWindow side effect?
+        self.horizontalHeader().setStretchLastSection( True )
+
+    def sizeHint( self ):
+        """
+        Provides a size suitable for viewing the table with all its columns
+        resized to their contents.
+
+        Takes no arguments.
+
+        Return 1 value:
+
+          QSize - containing the suggested width and height.
+
+        """
+        default = super().sizeHint()
+
+        if self.model():
+            self.resizeColumnsToContents()
+
+            width = sum( [self.columnWidth( i )
+                          for i in range( self.model().columnCount() )] )
+
+            if self.verticalScrollBar().isVisible():
+                width += self.verticalScrollBar().width()
+
+            return QSize( max( width, default.width() ), default.height() )
+        else:
+            return default
 
 class PhotoRecordViewer( RecordWindow ):
     """
     """
+
+    # identifiers for columns in selection model.
+    ID_COLUMN = 0
+    PATH_COLUMN = 1
+    STATE_COLUMN = 2
+    NUM_COLUMNS = 3
 
     def __init__( self, database_file_name=None ):
         """
@@ -243,7 +299,7 @@ class PhotoRecordViewer( RecordWindow ):
         self.preview_pixmap = None
 
         # XXX: specify a callback to save the database.
-        super().__init__( (800, 600), None )
+        super().__init__( window_size=QSize( 1024, 768 ) )
 
         self.setWindowTitle( "Photo Record Viewer" )
         self.show()
@@ -265,30 +321,31 @@ class PhotoRecordViewer( RecordWindow ):
         # NOTE: we keep photo id in the model so we can pull it from our
         #       selection and access the record's data.
         #
-        self.photosModel = QStandardItemModel( 0, 3, self )
+        self.photosModel = QStandardItemModel( len(self.photos), self.NUM_COLUMNS, self )
 
-        self.photosModel.setHeaderData( 0, Qt.Horizontal, "Photo ID" )
-        self.photosModel.setHeaderData( 1, Qt.Horizontal, "File Path" )
-        self.photosModel.setHeaderData( 2, Qt.Horizontal, "State" )
+        self.photosModel.setHeaderData( self.ID_COLUMN, Qt.Horizontal, "Photo ID" )
+        self.photosModel.setHeaderData( self.PATH_COLUMN, Qt.Horizontal, "File Path" )
+        self.photosModel.setHeaderData( self.STATE_COLUMN, Qt.Horizontal, "State" )
 
         # walk through each of the photo records and insert a new item at the
         # beginning of the model's list.
-        #
-        # XXX: there has got to be a better way to insert things.  the
-        #      QAbstractItemModel doesn't have an insert that grows.
-        #      inserting QStandardItems explicitly turns our id into an
-        #      empty string.  calling reversed() on the photos does not
-        #      actually do what we want.
-        for photo in self.photos:
-            self.photosModel.insertRow( 0 )
-            self.photosModel.setData( self.photosModel.index( 0, 0 ), photo["id"] )
-            self.photosModel.setData( self.photosModel.index( 0, 1 ), photo["filename"] )
-            self.photosModel.setData( self.photosModel.index( 0, 2 ), photo["state"] )
+        for index, photo in enumerate(self.photos):
+            id_item       = QStandardItem( photo["id"] )
+            filename_item = QStandardItem( photo["filename"] )
+            state_item    = QStandardItem( photo["state"] )
+
+            id_item.setData( int( photo["id"] ) )
+            filename_item.setData( photo["filename"] )
+            state_item.setData( photo["state"] )
+
+            self.photosModel.setItem( index, self.ID_COLUMN, id_item )
+            self.photosModel.setItem( index, self.PATH_COLUMN, filename_item )
+            self.photosModel.setItem( index, self.STATE_COLUMN, state_item )
 
         # create the proxy model for filtering our data based on record
         # processing state.
         self.proxyPhotosModel = QSortFilterProxyModel()
-        self.proxyPhotosModel.setFilterKeyColumn( 2 )
+        self.proxyPhotosModel.setFilterKeyColumn( self.PATH_COLUMN )
         self.proxyPhotosModel.setSourceModel( self.photosModel )
 
     def create_widgets( self ):
@@ -303,35 +360,11 @@ class PhotoRecordViewer( RecordWindow ):
         Returns nothing.
         """
 
-        self.selectionView = QTreeView()
+        self.selectionView = SelectionView()
         self.selectionView.setModel( self.proxyPhotosModel )
         self.selectionView.activated.connect( self.selectionActivation )
         self.selectionView.selectionModel().selectionChanged.connect( self.selectionChange )
-        self.selectionView.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        self.selectionView.setAlternatingRowColors( True )
-        self.selectionView.setColumnHidden( 0, True ) # hide the ID
-        self.selectionView.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
-        self.selectionView.setSortingEnabled( True )
-        self.selectionView.resizeColumnToContents( 1 )
-
-        # configure the column headers.
-        # XXX: these don't quite work.  stretching the last section prevents the
-        #      columns from resizing at the user's request (which would be fine)
-        #      though the default size is wonky.
-        #
-        #      specifying QHeaderView.{Stretch,ResizeToContents} disables any
-        #      interactive or programmatic modification of the column sizes.
-        #
-#        self.selectionView.header().setStretchLastSection( True ) # have the state column fill space - XXX not quite what we want
-#        self.selectionView.header().setSectionResizeMode( 0, QHeaderView.Stretch )
-#        self.selectionView.header().setSectionResizeMode( 1, QHeaderView.ResizeToContents )
-#        self.selectionView.header().setSectionResizeMode( 2, QHeaderView.Stretch )
-
-#        self.selectionView.setAllColumnsShowFocus( True )
-#        self.selectionView.keyPressEvent = self.keyPressEvent # XXX: don't do this, it eats keys
-
-        # prevent the users from rearranging the columns.
-        self.selectionView.header().setSectionsMovable( False )
+        self.selectionView.setColumnHidden( self.ID_COLUMN, True ) # hide the ID
 
         self.selectionBox = QComboBox()
 
@@ -345,7 +378,6 @@ class PhotoRecordViewer( RecordWindow ):
         self.selectionBoxLabel.setBuddy( self.selectionBox )
 
         self.photoPreview = QLabel()
-
         self.photoPreview.setBackgroundRole( QPalette.Base )
         # XXX: why is a preferred size policy with a minimum size better than
         #      ignored with minimum?  the latter causes the image to overflow into
@@ -360,6 +392,12 @@ class PhotoRecordViewer( RecordWindow ):
         self.infoLocationLabel = QLabel()
         self.infoTakenLabel    = QLabel()
         self.infoTagsLabel     = QLabel()
+
+        # dock widget which will hold the selection layout once created
+        # in create_layout, for now it gets an empty widget.
+        self.selection_dock = QDockWidget()
+        self.selection_dock.setFeatures( QDockWidget.DockWidgetMovable )
+        self.selection_dock.setWidget( QWidget() )
 
     def create_layout( self ):
         """
@@ -381,29 +419,20 @@ class PhotoRecordViewer( RecordWindow ):
         selection_layout.setSpacing( 0 )
         selection_layout.addWidget( self.selectionView )
 
-        record_selection_box = QGroupBox()
-        record_selection_box.setLayout( selection_layout )
-
         selection_type_layout = QHBoxLayout()
         selection_type_layout.setContentsMargins( 0, 0, 0, 0 )
         selection_type_layout.setSpacing( 0 )
         selection_type_layout.addWidget( self.selectionBoxLabel )
         selection_type_layout.addWidget( self.selectionBox )
+        selection_type_layout.setStretchFactor( self.selectionBox, 1 )
 
-        selection_type_box = QGroupBox()
-        selection_type_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
-        selection_type_box.setLayout( selection_type_layout )
-
-        selection_layout.addWidget( selection_type_box )
+        selection_layout.addLayout( selection_type_layout )
+        selection_layout.setStretchFactor( self.selectionView, 1 )
 
         info_layout = QVBoxLayout()
         info_layout.setContentsMargins( 0, 0, 0, 0 )
         info_layout.setSpacing( 0 )
 
-        record_information_box = QGroupBox()
-        record_information_box.setLayout( info_layout )
-
-        stats_box    = QGroupBox()
         stats_layout = QGridLayout()
         stats_layout.setContentsMargins( 0, 0, 0, 0 )
         stats_layout.setSpacing( 0 )
@@ -433,23 +462,22 @@ class PhotoRecordViewer( RecordWindow ):
         stats_layout.addWidget( self.infoTagsLabel,
                                 4, 1 )
 
-        stats_box.setLayout( stats_layout )
-
         info_layout.addWidget( self.photoPreview )
-        info_layout.addWidget( stats_box )
+        info_layout.addLayout( stats_layout )
+        info_layout.setStretchFactor( self.photoPreview, 1 )
 
-        main_layout = QHBoxLayout()
-        main_layout.addWidget( record_selection_box )
-        main_layout.addWidget( record_information_box )
-        main_layout.setContentsMargins( 0, 0, 0, 0 )
-        main_layout.setSpacing( 0 )
+        self.centralWidget = QWidget()
+        self.centralWidget.setLayout( info_layout )
 
-        self.centralWidget = QGroupBox()
-        self.centralWidget.setLayout( main_layout )
+        self.selection_dock.widget().setLayout( selection_layout )
+
+        self.addDockWidget( Qt.LeftDockWidgetArea, self.selection_dock )
+
+        self.setCentralWidget( self.centralWidget )
 
     def create_menus( self ):
         """
-        Creats the menus for a PhotoRecordViewer.
+        Creates the menus for a PhotoRecordViewer.
 
         This will be invoked after the models are created and widgets are laid
         out (see create_models(), create_widgets(), and create_layouts()).
@@ -497,7 +525,7 @@ class PhotoRecordViewer( RecordWindow ):
         # NOTE: since the first column of our view is hidden, we need to
         #       select the first visible column instead.
         #
-        self.selectionView.setCurrentIndex( self.proxyPhotosModel.index( 0, 1 ) )
+        self.selectionView.setCurrentIndex( self.proxyPhotosModel.index( 0, self.PATH_COLUMN ) )
 
     def save_database( self ):
         """
@@ -533,16 +561,40 @@ class PhotoRecordViewer( RecordWindow ):
 
         # get the ID column (which is hidden in the proxy's view) in the
         # original model.
-        photo_id  = self.photosModel.itemFromIndex( index.sibling( index.row(), 0 ) ).text()
+        photo_id = self.photosModel.itemFromIndex( index.sibling( index.row(), self.ID_COLUMN ) ).data()
 
-        return int( photo_id )
+        return photo_id
 
+    @pyqtSlot( int )
     def remove_photo_editor( self, photo_id ):
+        """
+        Slot invoked when a spawned PhotoRecordEditor is closed by the user.
+        The corresponding entry in the tracking dictionary is removed.
+
+        Takes 1 argument.
+
+          photo_id - ID corresponding to the photo in the now closed
+                     PhotoRecordEditor.
+
+        Returns nothing.
+        """
 
         print( "Removing photo ID={:d} from the edit list.".format( photo_id ) )
         self.photo_record_editors.pop( photo_id, None )
 
+    @pyqtSlot( int )
     def refresh_photo_record( self, photo_id ):
+        """
+        Slot invoked when a photo record has been committed in a
+        PhotoRecordEditor and whose state needs to be refreshed within
+        our model.
+
+        Takes 1 argument.
+
+          photo_id - ID corresponding to the photo just committed.
+
+        Returns nothing.
+        """
 
         # update the model's information about this record's state.
         for photo in self.photos:
@@ -550,13 +602,14 @@ class PhotoRecordViewer( RecordWindow ):
                 # find this record in the model by it's photo identifier
                 # (there can, and will, only be one) and update it's
                 # processing state.
-                index = self.photosModel.match( self.photosModel.index( 0, 0 ),
-                                                Qt.DisplayRole,
-                                                str( photo_id ),
+                index = self.photosModel.match( self.photosModel.index( 0, self.ID_COLUMN ),
+                                                DATA_ROLE,
+                                                photo_id,
                                                 1,
-                                                Qt.MatchFixedString )[0]
+                                                Qt.MatchExactly )[0]
 
-                self.photosModel.setData( index.sibling( index.row(), 2 ), photo["state"] )
+                self.photosModel.setData( index.sibling( index.row(), self.STATE_COLUMN ), photo["state"] )
+                break
 
         # update the preview of this record if it's currently selected.
         # otherwise the next time it is selected we'll see the new changes.
@@ -574,7 +627,8 @@ class PhotoRecordViewer( RecordWindow ):
         elif self.db.are_data_dirty():
             # ask the user if they want to discard their changes.
             confirmation_dialog = QMessageBox()
-            confirmation_dialog.setInformativeText( "Unsaved changes have been made.  Are you sure you want to exit?" )
+            confirmation_dialog.setInformativeText( "Unsaved changes have been made.  "
+                                                    "Are you sure you want to exit?" )
             confirmation_dialog.setStandardButtons( QMessageBox.Ok | QMessageBox.Cancel )
             confirmation_dialog.setDefaultButton( QMessageBox.Cancel )
 
@@ -587,8 +641,6 @@ class PhotoRecordViewer( RecordWindow ):
 
         # time to go away.
         event.accept()
-
-        super().closeEvent( event )
 
     def selectionChange( self, selected, deselected ):
         """
@@ -634,18 +686,17 @@ class PhotoRecordViewer( RecordWindow ):
             if photo["id"] == photo_id:
                 print( "Editing photo ID {:d}.".format( photo_id ) )
 
-                # call our refresh method when this window commits changes to
-                # the record of interest...
-                commit_callback = partial( self.refresh_photo_record, photo_id )
-
-                # ... and cleanup our state when finished editing.
-                close_callback = partial( self.remove_photo_editor, photo_id )
-
                 self.photo_record_editors[photo_id] = PhotoRecordEditor( self.db,
                                                                          photo,
-                                                                         self.preview_pixmap,
-                                                                         close_callback,
-                                                                         commit_callback )
+                                                                         self.preview_pixmap )
+
+                # call our refresh method when this window commits changes to
+                # the record of interest...
+                self.photo_record_editors[photo_id].committed.connect( self.refresh_photo_record )
+
+                # ... and cleanup our state when finished editing.
+                self.photo_record_editors[photo_id].closed.connect( self.remove_photo_editor )
+
                 self.photo_record_editors[photo_id].show()
                 break
 
@@ -785,8 +836,13 @@ class PhotoRecordEditor( RecordEditor ):
     """
     # XXX: rearrange the methods - subclassed, event handlers, ours
 
+    # identifiers for the columns of our model.
+    ID_COLUMN    = 0
+    STATE_COLUMN = 1
+    NUM_COLUMNS  = 2
+
     # XXX: review the calling convention.
-    def __init__( self, db, photo_record, preview_pixmap, close_callback=None, commit_callback=None ):
+    def __init__( self, db, photo_record, preview_pixmap ):
 
         self.db          = db
         self.art_records = db.get_art_records( photo_record["id"] )
@@ -795,7 +851,7 @@ class PhotoRecordEditor( RecordEditor ):
         # only be edited by one window at a time.
         self.art_record_editors = dict()
 
-        super().__init__( photo_record, preview_pixmap, (800, 600), close_callback, commit_callback )
+        super().__init__( photo_record, preview_pixmap, QSize(800, 600) )
 
         self.setWindowTitle( "Photo Record Editor: {:s} [{:d}]".format( self.record["filename"],
                                                                         self.record["id"] ) )
@@ -813,22 +869,28 @@ class PhotoRecordEditor( RecordEditor ):
         #
         # NOTE: we keep art id in the model so we can pull it from our
         #       selection and access the record's data.
-        self.artModel = QStandardItemModel( 0, 2, self )
+        self.artModel = QStandardItemModel( len( self.art_records ),
+                                            self.NUM_COLUMNS, self )
 
-        self.artModel.setHeaderData( 0, Qt.Horizontal, "Art ID" )
-        self.artModel.setHeaderData( 1, Qt.Horizontal, "State" )
+        self.artModel.setHeaderData( self.ID_COLUMN, Qt.Horizontal, "Art ID" )
+        self.artModel.setHeaderData( self.STATE_COLUMN, Qt.Horizontal, "State" )
 
         # walk through each of the photo records and insert a new item at the
         # beginning of the model's list.
-        for art in self.art_records:
-            self.artModel.insertRow( 0 )
-            self.artModel.setData( self.artModel.index( 0, 0 ), art["id"] )
-            self.artModel.setData( self.artModel.index( 0, 1 ), art["state"] )
+        for index, art in enumerate( self.art_records ):
+            id_item = QStandardItem( str( art["id"] ) )
+            state_item = QStandardItem( art["state"] )
+
+            id_item.setData( art["id"] )
+            state_item.setData( art["state"] )
+
+            self.artModel.setItem( index, self.ID_COLUMN, id_item )
+            self.artModel.setItem( index, self.STATE_COLUMN, state_item )
 
         # create the proxy model for filtering our data based on record
         # processing state.
         self.proxyArtModel = QSortFilterProxyModel()
-        self.proxyArtModel.setFilterKeyColumn( 1 )
+        self.proxyArtModel.setFilterKeyColumn( self.STATE_COLUMN )
         self.proxyArtModel.setSourceModel( self.artModel )
 
     def create_widgets( self ):
@@ -864,15 +926,10 @@ class PhotoRecordEditor( RecordEditor ):
         #   art record selection.
         #
         #   XXX: describe these.
-        self.selectionView = QTreeView()
+        self.selectionView = SelectionView()
         self.selectionView.setModel( self.proxyArtModel )
         self.selectionView.activated.connect( self.selectionActivation )
         self.selectionView.selectionModel().selectionChanged.connect( self.recordSelectionChange )
-        self.selectionView.setEditTriggers( QAbstractItemView.NoEditTriggers )
-        self.selectionView.setAlternatingRowColors( True )
-        self.selectionView.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
-        self.selectionView.setSortingEnabled( True )
-        self.selectionView.header().setSectionsMovable( False )
 
         #   record addition and removal buttons.
         self.newRecordButton = QPushButton( "&New Record" )
@@ -953,9 +1010,6 @@ class PhotoRecordEditor( RecordEditor ):
         selection_type_layout.setSpacing( 0 )
         selection_type_layout.addWidget( self.selectionBoxLabel )
         selection_type_layout.addWidget( self.selectionBox )
-        selection_type_box = QGroupBox()
-        selection_type_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
-        selection_type_box.setLayout( selection_type_layout )
 
         #   art record creation/deletion buttons.
         record_modification_layout = QHBoxLayout()
@@ -964,17 +1018,10 @@ class PhotoRecordEditor( RecordEditor ):
         record_modification_layout.addWidget( self.newRecordButton )
         record_modification_layout.addWidget( self.deleteRecordButton )
 
-        record_modification_box = QGroupBox()
-        record_modification_box.setLayout( record_modification_layout )
-        record_modification_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
-
         selection_layout.addWidget( self.selectionView )
-        selection_layout.addWidget( selection_type_box )
-        selection_layout.addWidget( record_modification_box )
-
-        selection_box = QGroupBox()
-        selection_box.setLayout( selection_layout )
-        selection_box.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed ) # reduces the space needed.
+        selection_layout.addLayout( selection_type_layout )
+        selection_layout.addLayout( record_modification_layout )
+        selection_layout.setStretchFactor( self.selectionView, 1 )
 
         #   selected art record information and photo record editing widgets.
         info_and_edit_layout = QGridLayout()
@@ -983,73 +1030,61 @@ class PhotoRecordEditor( RecordEditor ):
 
         # XXX: the layout of these labels is *awful*.  need to fix this.
         art_header_label = QLabel( "<b>Art Record:</b>" )
-        art_header_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( art_header_label,
-                                        0, 0 )
+                                        0, 0, 1, 4 )
 
         type_label = QLabel( "Type:" )
-        type_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( type_label,
                                         1, 0 )
         info_and_edit_layout.addWidget( self.artTypeLabel,
                                         1, 1 )
 
         size_label = QLabel( "Size:" )
-        size_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( size_label,
                                         2, 0 )
         info_and_edit_layout.addWidget( self.artSizeLabel,
                                         2, 1 )
 
         quality_label = QLabel( "Quality:" )
-        quality_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( quality_label,
                                         3, 0 )
         info_and_edit_layout.addWidget( self.artQualityLabel,
                                         3, 1 )
 
         date_label = QLabel( "Date:" )
-        date_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( date_label,
                                         4, 0 )
         info_and_edit_layout.addWidget( self.artDateLabel,
                                         4, 1 )
 
         artists_label = QLabel( "Artists:" )
-        artists_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( artists_label,
                                         1, 2 )
         info_and_edit_layout.addWidget( self.artArtistsLabel,
                                         1, 3 )
 
         associates_label = QLabel( "Associates:" )
-        associates_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( associates_label,
                                         2, 2 )
         info_and_edit_layout.addWidget( self.artAssociatesLabel,
                                         2, 3 )
 
         vandals_label = QLabel( "Vandals:" )
-        vandals_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( vandals_label,
                                         3, 2 )
         info_and_edit_layout.addWidget( self.artVandalsLabel,
                                         3, 3 )
 
         tags_label = QLabel( "Tags:" )
-        tags_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( tags_label,
                                         4, 2 )
         info_and_edit_layout.addWidget( self.artTagsLabel,
                                         4, 3 )
 
         photo_header_label = QLabel( "<b>Photo Record:</b>" )
-        photo_header_label.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( photo_header_label,
-                                        5, 0 )
+                                        5, 0, 1, 4 )
 
-        self.photoProcessingStateComboLabel.setSizePolicy( QSizePolicy.Fixed,
-                                                           QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( self.photoProcessingStateComboLabel,
                                         6, 0 )
         info_and_edit_layout.addWidget( self.photoProcessingStateComboBox,
@@ -1061,25 +1096,22 @@ class PhotoRecordEditor( RecordEditor ):
                                         7, 1,
                                         1, 3 )
 
-        art_stats_box = QGroupBox()
-        art_stats_box.setLayout( info_and_edit_layout )
-
-        horizontal_layout.addWidget( selection_box )
-        horizontal_layout.addWidget( art_stats_box )
-
-        horizontal_box = QGroupBox()
-        horizontal_box.setLayout( horizontal_layout )
+        horizontal_layout.addLayout( selection_layout )
+        horizontal_layout.addLayout( info_and_edit_layout )
+        horizontal_layout.setStretchFactor( info_and_edit_layout, 1 )
 
         main_layout.addWidget( self.photoPreview )
         main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
-        main_layout.addWidget( horizontal_box )
+        main_layout.addLayout( horizontal_layout )
 
-        self.centralWidget = QGroupBox()
+        self.centralWidget = QWidget()
         self.centralWidget.setLayout( main_layout )
+
+        self.setCentralWidget( self.centralWidget )
 
     def create_menus( self ):
         """
-        Creats the menus for a PhotoRecordEditor.
+        Creates the menus for a PhotoRecordEditor.
 
         Takes no arguments.
 
@@ -1115,7 +1147,7 @@ class PhotoRecordEditor( RecordEditor ):
         """
 
         # select the first entry so we can use the keyboard for navigation.
-        self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, 0 ) )
+        self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, self.ID_COLUMN ) )
 
         # set the processing state combination box to this record's state.
         combo_index = self.photoProcessingStateComboBox.findText( self.record["state"] )
@@ -1129,8 +1161,8 @@ class PhotoRecordEditor( RecordEditor ):
         Takes 1 argument:
 
           update_photo_state - Optional flag indicating whether the photo
-                               record's state should be commited.  If False,
-                               the state is not actually commited, but the
+                               record's state should be committed.  If False,
+                               the state is not actually committed, but the
                                parent class' method is invoked to signal
                                a change related to the record (e.g. a child
                                art record has been added or removed).  If
@@ -1177,9 +1209,9 @@ class PhotoRecordEditor( RecordEditor ):
 
         # get the ID column (which is hidden in the proxy's view) in the
         # original model.
-        art_id  = self.artModel.itemFromIndex( index.sibling( index.row(), 0 ) ).text()
+        art_id = self.artModel.itemFromIndex( index.sibling( index.row(), self.ID_COLUMN ) ).data()
 
-        return int( art_id )
+        return art_id
 
     def create_new_record( self ):
         """
@@ -1192,9 +1224,13 @@ class PhotoRecordEditor( RecordEditor ):
         self.art_records.append( new_art_record )
 
         # add the record into the model so we can see it.
-        self.artModel.insertRow( 0 )
-        self.artModel.setData( self.artModel.index( 0, 0 ), new_art_record["id"] )
-        self.artModel.setData( self.artModel.index( 0, 1 ), new_art_record["state"] )
+        id_item    = QStandardItem( str( new_art_record["id"] ) )
+        state_item = QStandardItem( new_art_record["state"] )
+
+        id_item.setData( new_art_record["id"] )
+        state_item.setData( new_art_record["state"] )
+
+        self.artModel.appendRow( [id_item, state_item] )
 
         # edit the record as a convenience.
         self.edit_art_record( new_art_record["id"] )
@@ -1227,11 +1263,11 @@ class PhotoRecordEditor( RecordEditor ):
         # find this record in the model by it's art identifier (there
         # can, and will, only be one) and update it's processing
         # state.
-        index = self.artModel.match( self.artModel.index( 0, 0 ),
-                                     Qt.DisplayRole,
-                                     str( art_id ),
+        index = self.artModel.match( self.artModel.index( 0, self.ID_COLUMN ),
+                                     DATA_ROLE,
+                                     art_id,
                                      1,
-                                     Qt.MatchFixedString )[0]
+                                     Qt.MatchExactly )[0]
         self.artModel.removeRow( index.row() )
 
         # remove the record from the database.
@@ -1264,28 +1300,52 @@ class PhotoRecordEditor( RecordEditor ):
             if art["id"] == art_id:
                 print( "Editing art ID {:d}.".format( art_id ) )
 
-                # call our refresh method when this window commits changes to
-                # the record of interest...
-                commit_callback = partial( self.refresh_art_record, art_id )
-
-                # ... and cleanup our state when finished editing.
-                close_callback = partial( self.remove_art_editor, art_id )
-
                 self.art_record_editors[art_id] = ArtRecordEditor( self.db,
                                                                    self.record["id"],
                                                                    art,
-                                                                   self.preview_pixmap,
-                                                                   close_callback,
-                                                                   commit_callback )
+                                                                   self.preview_pixmap )
+
+                # call our refresh method when this window commits changes to
+                # the record of interest...
+                self.art_record_editors[art_id].committed.connect( self.refresh_art_record )
+
+                # ... and cleanup our state when finished editing.
+                self.art_record_editors[art_id].closed.connect( self.remove_art_editor )
+
                 self.art_record_editors[art_id].show()
                 break
 
+    @pyqtSlot( int )
     def remove_art_editor( self, art_id ):
+        """
+        Slot invoked when a spawned ArtRecordEditor is closed by ther user.
+        The corresponding entry in the tracking dictionary is removed.
+
+        Takes 1 argument.
+
+          art_id - ID corresponding to the art in the now closed
+                   ArtRecordEditor.
+
+        Returns nothing.
+        """
 
         print( "Removing art ID={:d} from the edit list.".format( art_id ) )
         self.art_record_editors.pop( art_id, None )
 
+    @pyqtSlot( int )
     def refresh_art_record( self, art_id ):
+        """
+        Slot invoked when an art record has been committed in an
+        ArtRecordEditor and whose state needs to be refreshed within
+        our model.
+
+        Takes 1 argument.
+
+          art_id - ID corresponding to the art record just committed.
+
+        Returns nothing.
+        """
+
         print( "Need to refresh art record #{:d}.".format( art_id ) )
 
         # XXX: factor this into a separate routine
@@ -1294,13 +1354,14 @@ class PhotoRecordEditor( RecordEditor ):
                 # find this record in the model by it's art identifier (there
                 # can, and will, only be one) and update it's processing
                 # state.
-                index = self.artModel.match( self.artModel.index( 0, 0 ),
-                                             Qt.DisplayRole,
-                                             str( art_id ),
+                index = self.artModel.match( self.artModel.index( 0, self.ID_COLUMN ),
+                                             DATA_ROLE,
+                                             art_id,
                                              1,
-                                             Qt.MatchFixedString )[0]
+                                             Qt.MatchExactly )[0]
 
-                self.artModel.setData( index.sibling( index.row(), 1 ), art["state"] )
+                self.artModel.setData( index.sibling( index.row(), self.STATE_COLUMN ),
+                                       art["state"] )
 
                 # update this record's rubberband box.
                 if art["region"] is not None:
@@ -1355,16 +1416,16 @@ class PhotoRecordEditor( RecordEditor ):
         self.photoPreview.set_selection( art_id )
 
         # update the labels.
-        self.artTypeLabel.setText( art_record["type"] )
-        self.artSizeLabel.setText( art_record["size"] )
-        self.artQualityLabel.setText( art_record["quality"] )
-        self.artDateLabel.setText( art_record["date"] )
-        self.artArtistsLabel.setText( ", ".join( art_record["artists"] ) )
-        self.artAssociatesLabel.setText( ", ".join( art_record["associates"] ) )
-        self.artVandalsLabel.setText( ", ".join( art_record["vandals"] ) )
-        self.artTagsLabel.setText( ", ".join( art_record["tags"] ) )
+        self.artTypeLabel.setText( record["type"] )
+        self.artSizeLabel.setText( record["size"] )
+        self.artQualityLabel.setText( record["quality"] )
+        self.artDateLabel.setText( record["date"] )
+        self.artArtistsLabel.setText( ", ".join( record["artists"] ) )
+        self.artAssociatesLabel.setText( ", ".join( record["associates"] ) )
+        self.artVandalsLabel.setText( ", ".join( record["vandals"] ) )
+        self.artTagsLabel.setText( ", ".join( record["tags"] ) )
 
-    def recordSelectionChange( self, selected, deslected ):
+    def recordSelectionChange( self, selected, deselected ):
         """
         """
 
@@ -1430,10 +1491,11 @@ class PhotoRecordEditor( RecordEditor ):
             event.ignore()
             return
 
+        # make sure we emit our closed signal.
+        super().closeEvent(event)
+
         # time to go away.
         event.accept()
-
-        super().closeEvent( event )
 
     def run_image_viewer( self ):
         """
@@ -1474,7 +1536,7 @@ class ArtRecordEditor( RecordEditor ):
     """
 
     # XXX: review the calling convention.
-    def __init__( self, db, photo_id, art_record, preview_pixmap, close_callback=None, commit_callback=None ):
+    def __init__( self, db, photo_id, art_record, preview_pixmap ):
 
         self.db             = db
         self.photo_id       = photo_id
@@ -1484,7 +1546,7 @@ class ArtRecordEditor( RecordEditor ):
         self.photo_record   = self.db.get_photo_records( photo_id )
         print( "Photo record [{}]: {}".format( self.photo_id, self.photo_record ) )
 
-        super().__init__( art_record, preview_pixmap, (800, 600), close_callback, commit_callback )
+        super().__init__( art_record, preview_pixmap, QSize(800, 600) )
 
         self.setWindowTitle( "Art Record Editor: {:s} [{:d}, {:d}]".format( self.photo_record["filename"],
                                                                             self.photo_id,
@@ -1692,10 +1754,6 @@ class ArtRecordEditor( RecordEditor ):
         editing_layout.addWidget( self.artDateLineEdit,
                                   5, 1 )
 
-
-        editing_box = QGroupBox()
-        editing_box.setLayout( editing_layout )
-
         #   vertical layout of the photo preview and everything else.
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins( 0, 0, 0, 0 )
@@ -1703,22 +1761,29 @@ class ArtRecordEditor( RecordEditor ):
 
         main_layout.addWidget( self.photoPreview )
         main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
-        main_layout.addWidget( editing_box )
+        main_layout.addLayout( editing_layout )
+        main_layout.setStretchFactor( self.photoPreview, 1 )
 
         self.centralWidget = QGroupBox()
         self.centralWidget.setLayout( main_layout )
 
+        self.setCentralWidget( self.centralWidget )
+
     def create_menus( self ):
         """
-        Creats the menus for an ArtRecordEditor.
+        Creates the menus for an ArtRecordEditor.
 
         Takes no arguments.
 
         Returns nothing.
         """
-
+        # XXX: for whatever reason, closing the window via menu action
+        # when there are more than two QMainWindow instances causes
+        # a hard crash. Left in for now since shortcut works fine,
+        # but a refactor is necessary to get Record/Art viewer to be
+        # QWidget decendents, rather than QMainWindow.
         self.closeAct  = QAction( "C&lose", self, shortcut="Ctrl+W",
-                                  triggered=self.close )
+                                   triggered=self.close )
 
         self.commitAct = QAction( "&Commit", self, shortcut="Ctrl+S",
                                   triggered=self.commit_record )
@@ -1779,7 +1844,7 @@ class ArtRecordEditor( RecordEditor ):
         Returns nothing.
         """
 
-        print( "Commiting art record #{:d}.".format( self.record["id"] ) )
+        print( "Committing art record #{:d}.".format( self.record["id"] ) )
 
         # update the record based on what's currently visible.
         self.record["type"]          = self.artTypeComboBox.currentText()
@@ -1803,6 +1868,15 @@ class ArtRecordEditor( RecordEditor ):
         self.db.mark_data_dirty()
 
         super().commit_record()
+
+    def closeEvent( self, event ):
+        """
+        """
+
+        # make sure our closed signal is emitted.
+        super().closeEvent( event )
+
+        event.accept()
 
 @lru_cache( maxsize=16 )
 def get_pixmap_from_image( filename ):
