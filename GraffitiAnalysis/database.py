@@ -991,7 +991,7 @@ class PhotoRecord( Record ):
     XXX: constants here need to be consistent but different than the database
     """
 
-    def __init__( self, id, filename, resolution=None, state=None, location=None, rotation=0, created_time=None, modified_time=None, photo_time=None, tags=None ):
+    def __init__( self, id, filename, resolution=None, state=None, location=None, rotation=0, created_time=None, modified_time=None, photo_time=None, tags=[] ):
         """
         Constructs an PhotoRecord object from the supplied parameters.
 
@@ -1052,8 +1052,6 @@ class PhotoRecord( Record ):
                           "rotation", "state", "tags"]
         _mutable_keys  = ["location", "modified_time", "photo_time",
                           "resolution", "rotation", "state", "tags"]
-
-        tags           = []
 
         super().__init__( _readable_keys,
                           _mutable_keys,
