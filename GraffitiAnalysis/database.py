@@ -1254,7 +1254,8 @@ class Database( object ):
         """
 
         # compute a unique index that hasn't been used yet.
-        photo_id = max( [photo["id"] for photo in self.photos] ) + 1
+        photo_id = max( [photo["id"] for photo in self.photos],
+                        default=0 ) + 1
 
         self.photos.append( PhotoRecord( photo_id,
                                          file_name,
@@ -1313,7 +1314,8 @@ class Database( object ):
         """
 
         # compute a unique index that hasn't been used yet.
-        art_id = max( [art["id"] for art in self.arts] ) + 1
+        art_id = max( [art["id"] for art in self.arts],
+                      default=0 ) + 1
 
         # XXX: hardcoded constant
         self.arts.append( ArtRecord( art_id, photo_id, "throwup" ) )
