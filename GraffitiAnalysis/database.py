@@ -1218,7 +1218,8 @@ class Database( object ):
     def get_photo_records( self, photo_ids=None ):
         """
         Retrieves all of the PhotoRecord's in the database matching the
-        supplied identifiers.
+        supplied identifiers.  Records returned are in the same order of the
+        supplied photo identifiers.
 
         Takes 1 argument:
 
@@ -1240,7 +1241,12 @@ class Database( object ):
         elif type( photo_ids ) != list:
             photo_ids = [photo_ids]
 
-        requested_photos = [photo for photo in self.photos if photo["id"] in photo_ids]
+        # build a list of the PhotoRecords in the same order requested.
+        requested_photos = []
+        for photo_id in photo_ids:
+            for photo in self.photos:
+                if photo["id"] == photo_id:
+                    requested_photos.append( photo )
 
         # help the user and return a scalar if they requested a single record.
         #
@@ -1319,7 +1325,8 @@ class Database( object ):
     def get_art_records( self, photo_ids=None ):
         """
         Retrieves all of the ArtRecord's in the database associated with the
-        supplied PhotoRecords identifiers.
+        supplied PhotoRecords identifiers.  Returned records are grouped in
+        the same order of the supplied photo identifiers.
 
         Takes 1 argument:
 
@@ -1348,7 +1355,14 @@ class Database( object ):
         elif type( photo_ids ) != list:
             photo_ids = [photo_ids]
 
-        return [art for art in self.arts if art["photo_id"] in photo_ids]
+        # build a list of the ArtRecords in the same order requested.
+        requested_art = []
+        for photo_id in photo_ids:
+            for art in self.arts:
+                if art["photo_id"] == photo_id:
+                    requested_art.append( art )
+
+        return requested_art
 
     def new_art_record( self, photo_id ):
         """
