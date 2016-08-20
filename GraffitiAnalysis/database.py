@@ -967,6 +967,22 @@ class ArtRecord( Record ):
                           type=type,
                           vandals=vandals )
 
+
+    def __str__( self ):
+        """
+        Returns a string representation of the art record.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          string - String representation of the ArtRecord object.
+
+        """
+
+        return "ArtRecord({:d}, '{:d}')".format( self["photo_id"],
+                                                 self["id"] )
+
 class PhotoRecord( Record ):
     """
     Database record documenting one or more pieces of street art.  The
@@ -1066,6 +1082,21 @@ class PhotoRecord( Record ):
                           state=state,
                           tags=tags )
 
+    def __str__( self ):
+        """
+        Returns a string representation of the photo record.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          string - String representation of the PhotoRecord object.
+
+        """
+
+        return "PhotoRecord({:d}, '{:s}')".format( self["id"],
+                                                   self["filename"] )
+
 class Database( object ):
     """
     Represents a database of photo and art records for analyzing street art.
@@ -1096,6 +1127,21 @@ class Database( object ):
         self.modified_data = False
 
         self.load_database()
+
+    def __str__( self ):
+        """
+        Returns a string representation of the database.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          string - String representation of the Database object.
+
+        """
+
+        return "Database('{:s}'{:s})".format( self.filename if self.filename is not None else "<testing>",
+                                              "*" if self.modified_data else "" )
 
     def mark_data_dirty( self ):
         """
