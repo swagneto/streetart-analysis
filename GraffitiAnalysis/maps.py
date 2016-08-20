@@ -167,7 +167,7 @@ def get_folium_map( map_center, dimensions=None, zoom_level=12, use_simple_tiles
 
     return folium_map
 
-def create_photo_markers( photo_df, group, popup_html=None, popup_dimensions=None, marker_properties=None ):
+def create_photo_markers( photo_df, group, popup_html=None, popup_dimensions=None, marker_properties=None, uri_prefix=None ):
     """
     Creates Folium markers for each of the photos in the supplied DataFrame.
     All markers are added into a supplied folium.FeatureGroup or into a newly
@@ -242,6 +242,15 @@ def create_photo_markers( photo_df, group, popup_html=None, popup_dimensions=Non
         # XXX: these defaults are weird.
         popup_dimensions = (325, 285)
 
+    # assume we're serving data locally if the caller did not give us a
+    # URI prefix.  otherwise our path is empty and doesn't show up in
+    # the constructed URI.
+    if uri_prefix is None:
+        uri_prefix   = "file://"
+        current_path = os.path.realpath( os.path.curdir )
+    else:
+        current_path = ""
+
     # use a default popup if the caller did not provide one.
     if popup_html is None:
         popup_html = """
@@ -301,11 +310,10 @@ def create_photo_markers( photo_df, group, popup_html=None, popup_dimensions=Non
         kwargs = dict()
         kwargs["photo_filename"] = photo_series["filename"]
 
-        # XXX: this assumes we're doing local development.  this needs to be
-        #      fixed later.
-        kwargs["url"]            = "file://{:s}{:s}{:s}".format( os.path.realpath( os.path.curdir ),
-                                                                 os.path.sep,
-                                                                 photo_series["filename"] )
+        kwargs["url"]            = "{:s}{:s}{:s}{:s}".format( uri_prefix,
+                                                              current_path,
+                                                              os.path.sep,
+                                                              photo_series["filename"] )
         kwargs["image_width"]    = 160
         kwargs["image_height"]   = 120
         kwargs["photo_id"]       = photo_series.name
