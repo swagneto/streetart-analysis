@@ -1238,8 +1238,12 @@ class Database( object ):
 
         if photo_ids is None:
             return self.photos
-        elif type( photo_ids ) != list:
-            photo_ids = [photo_ids]
+
+        if type( photo_ids ) != list:
+            photo_ids  = [photo_ids]
+            scalar_out = True
+        else:
+            scalar_out = False
 
         # build a list of the PhotoRecords in the same order requested.
         requested_photos = []
@@ -1253,7 +1257,7 @@ class Database( object ):
         # NOTE: this assumes that the identifiers are unique and can't return
         #       multiple records...
         #
-        if len( photo_ids ) == 1 and len( requested_photos ) > 0:
+        if scalar_out:
             requested_photos = requested_photos[0]
 
         return requested_photos
