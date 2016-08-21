@@ -1141,9 +1141,10 @@ class PhotoRecordEditor( RecordEditor ):
 
         # update the record based on what's currently visible if requested.
         if update_photo_state:
-            self.record["state"] = self.photoProcessingStateComboBox.currentText()
-            self.record["tags"]  = list( map( lambda x: x.strip(),
-                                              self.photoTagsLineEdit.text().split( ", " ) ) )
+            self.record["modified_time"] = time.mktime( time.gmtime() )
+            self.record["state"]         = self.photoProcessingStateComboBox.currentText()
+            self.record["tags"]          = list( map( lambda x: x.strip(),
+                                                      self.photoTagsLineEdit.text().split( ", " ) ) )
 
             self.db.mark_data_dirty()
 
