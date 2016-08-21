@@ -73,6 +73,13 @@ def photos_to_dataframe( photos ):
 
     """
 
+    # ordered list of processing states of photos.  these will be categories
+    # in our DataFrame.
+    photo_states = ["unreviewed",
+                    "needs_review",
+                    "reviewed"]
+
+    # columns in the constructed DataFrame.
     photo_columns = ["id",
                      "filename",
                      "state",
@@ -109,9 +116,18 @@ def photos_to_dataframe( photos ):
                               photo["tags"],
                               photo) )
 
-    return pd.DataFrame.from_records( photo_tuples,
-                                      index="id",
-                                      columns=photo_columns )
+    # create our base DataFrame that we'll doctor up.
+    photos_df = pd.DataFrame.from_records( photo_tuples,
+                                           index="id",
+                                           columns=photo_columns )
+
+    # convert our state to ordered categorical data so that we can rely on its
+    # structure during analysis.
+    photos_df["state"] = pd.Categorical( photos_df["state"],
+                                         categories=photo_states,
+                                         ordered=True )
+
+    return photos_df
 
 def arts_to_dataframe( arts, photos_df=None ):
     """
@@ -132,6 +148,40 @@ def arts_to_dataframe( arts, photos_df=None ):
 
     """
 
+    # ordered list of types of art.  these will be categories in our
+    # DataFrame.
+    art_types = ["tag",
+                 "sticker",
+                 "stencil",
+                 "text",
+                 "other",
+                 "throwup",
+                 "piece",
+                 "mural"]
+
+    # ordered list of sizes of art.  these will be categories in our
+    # DataFrame.
+    art_sizes = ["tiny",
+                 "small",
+                 "medium",
+                 "large",
+                 "huge"]
+
+    # ordered list of qualities of art.  these will be categories in our
+    # DataFrame.
+    art_qualities = ["bad",
+                     "poor",
+                     "fair",
+                     "good",
+                     "excellent"]
+
+    # ordered list of processing states of art.  these will be categories in
+    # our DataFrame.
+    art_states = ["unreviewed",
+                  "needs_review",
+                  "reviewed"]
+
+    # columns in the constructed DataFrame.
     art_columns = ["id",
                    "photo_id",
                    "type",
@@ -173,9 +223,27 @@ def arts_to_dataframe( arts, photos_df=None ):
                             photo_series,
                             art) )
 
-    return pd.DataFrame.from_records( art_tuples,
-                                      index="id",
-                                      columns=art_columns )
+    # create our base DataFrame that we'll doctor up.
+    arts_df = pd.DataFrame.from_records( art_tuples,
+                                         index="id",
+                                         columns=art_columns )
+
+    # convert several columns to ordered categorical data so that we can rely
+    # on its structure during analysis.
+    arts_df["type"] = pd.Categorical( arts_df["type"],
+                                      categories=art_types,
+                                      ordered=True )
+    arts_df["size"] = pd.Categorical( arts_df["size"],
+                                      categories=art_sizes,
+                                      ordered=True )
+    arts_df["quality"] = pd.Categorical( arts_df["quality"],
+                                         categories=art_qualities,
+                                         ordered=True )
+    arts_df["state"] = pd.Categorical( arts_df["state"],
+                                       categories=art_states,
+                                       ordered=True )
+
+    return arts_df
 
 def gpx_to_dataframe( gpxs ):
     """
