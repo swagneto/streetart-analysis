@@ -228,7 +228,7 @@ class SelectionView( QTableView ):
         self.setEditTriggers( QAbstractItemView.NoEditTriggers )
         self.setAlternatingRowColors( True )
         self.verticalHeader().hide()
-        self.verticalHeader().setDefaultSectionSize( 20 )
+        self.verticalHeader().setDefaultSectionSize( self.verticalHeader().fontMetrics().height() + 2 )
         self.setSortingEnabled( True )
 
         # prevent the users from rearranging the columns.
@@ -257,11 +257,18 @@ class SelectionView( QTableView ):
         if self.model():
             self.resizeColumnsToContents()
 
-            width = sum( [self.columnWidth( i )
-                          for i in range( self.model().columnCount() )] )
+            width = self.horizontalHeader().length()
 
             if self.verticalScrollBar().isVisible():
                 width += self.verticalScrollBar().width()
+
+            width += self.frameWidth() * 2
+
+            # add some padding to ensure horizontal scroll bar
+            # doesn't appear by default.
+            # XXX: need to figure out why this is needed when
+            #      setLastSectionStretch is True
+            width += 7
 
             return QSize( max( width, default.width() ), default.height() )
         else:
@@ -345,7 +352,7 @@ class PhotoRecordViewer( RecordWindow ):
         # create the proxy model for filtering our data based on record
         # processing state.
         self.proxyPhotosModel = QSortFilterProxyModel()
-        self.proxyPhotosModel.setFilterKeyColumn( self.PATH_COLUMN )
+        self.proxyPhotosModel.setFilterKeyColumn( self.STATE_COLUMN )
         self.proxyPhotosModel.setSourceModel( self.photosModel )
 
     def create_widgets( self ):
