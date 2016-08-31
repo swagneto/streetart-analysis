@@ -43,6 +43,60 @@ import GraffitiAnalysis.widgets as grafwidgets
 # of a QStandardItem.
 DATA_ROLE = Qt.UserRole + 1
 
+class LineEditDialog( QDialog ):
+    """
+    Creates a dialog containing a labeled QLineEdit widget and a pair
+    of buttons to accept the input or dismiss it.  The resulting
+    dialog should be .exec_()'d so the result can be acquired with
+    acceptance returning LineEditDialog.ACCEPTED and dismissal
+    returning LineEditDialog.CANCELLED.
+    """
+
+    # constants for cancelling and accepting the line edit dialog.
+    CANCELLED = 0
+    ACCEPTED  = 1
+
+    def __init__( self, label="Input:", title="User Input" ):
+        """
+        Initializes a LineEditDialog with a label, its companiion line
+        edit, and a pair of buttons; one for accepting the dialog and
+        one for dismissing it.
+
+        Takes 1 argument:
+
+          label - Optional string specifying the label to show next to the
+                  QLineEdit widget.  If omitted, defaults to a generic
+                  input string.
+          title - Optional string specifying the dialog's window title.
+                  If omitted, defaults to a generic string.
+
+        Returns nothing.
+
+        """
+
+        super().__init__()
+
+        self.setWindowTitle( title )
+
+        self.artist_edit = QLineEdit( self )
+        okay_button      = QPushButton( "&Okay" )
+        cancel_button    = QPushButton( "&Cancel" )
+
+        # prevent our buttons from stretching if the dialog is resized to
+        # get more room in the line edit.
+        okay_button.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+        cancel_button.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
+
+        # layout the line edit on one row, and the buttons on another.
+        layout = QGridLayout( self )
+        layout.addWidget( QLabel( label ),  0, 0 )
+        layout.addWidget( self.artist_edit, 0, 1 )
+        layout.addWidget( okay_button,      1, 0 )
+        layout.addWidget( cancel_button,    1, 1 )
+
+        okay_button.clicked.connect( self.accept )
+        cancel_button.clicked.connect( self.reject )
+
 class RecordWindow( QMainWindow ):
     DEFAULT_H_SIZE = 800
     DEFAULT_V_SIZE = 600
@@ -1799,7 +1853,13 @@ class ArtRecordEditor( RecordEditor ):
         self.windowMenu.addAction( self.commitAct )
         self.windowMenu.addAction( self.closeAct )
 
+        self.newArtistAct = QAction( "New &Artist", self, shortcut="Ctrl+A",
+                                     triggered=self.new_artist )
+        self.databaseMenu = QMenu( "&Database", self )
+        self.databaseMenu.addAction( self.newArtistAct )
+
         self.menuBar().addMenu( self.windowMenu )
+        self.menuBar().addMenu( self.databaseMenu )
 
     def set_state( self ):
         """
@@ -1875,6 +1935,50 @@ class ArtRecordEditor( RecordEditor ):
         self.db.mark_data_dirty()
 
         super().commit_record()
+
+    def new_artist( self ):
+        """
+        Prompts the user for a new artist name and inserts it into the
+        database.  If the new artist does not already exist in the database
+        it is inserted into the artists model.
+
+        Takes no arguments.
+
+        Returns nothing.
+
+        """
+
+        artist_name_dialog = LineEditDialog( "Artist name:",
+                                             "New Artist Input" )
+        result             = artist_name_dialog.exec_()
+
+        # nothing to do if we were told this was an accident.
+        if result == LineEditDialog.CANCELLED:
+            print( "Cancelled" )
+            return
+
+        new_artist = artist_name_dialog.artist_edit.text().strip()
+
+        if len( new_artist ) == 0:
+            print( "No artist was supplied.  Ignoring." )
+            return
+
+        # see if this artist already exists in the database.
+        try:
+            self.db.new_artist( new_artist )
+        except NameError:
+            # XXX: better way to convey this
+            print( "'{:s}' is already in the database.".format( new_artist ) )
+            return
+
+        # identify the new artist's position within the database's list and
+        # update model to match.
+        artists_list     = self.db.get_artists()
+        new_artist_index = artists_list.index( new_artist )
+
+        self.artistsModel.insertRow( new_artist_index )
+        self.artistsModel.setData( self.artistsModel.index( new_artist_index ),
+                                   new_artist )
 
     def closeEvent( self, event ):
         """
