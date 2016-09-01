@@ -1214,6 +1214,8 @@ class PhotoRecordEditor( RecordEditor ):
         combo_index = self.photoProcessingStateComboBox.findText( self.record["state"] )
         self.photoProcessingStateComboBox.setCurrentIndex( combo_index )
 
+        self.photoTagsLineEdit.setText( "" if len( self.record["tags"] ) == 0 else ", ".join( self.record["tags"] ) )
+
     def commit_record( self, update_photo_state=True ):
         """
         Updates the PhotoRecordEditor's internal record with user selected
