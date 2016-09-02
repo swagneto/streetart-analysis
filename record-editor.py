@@ -58,7 +58,7 @@ class LineEditDialog( QDialog ):
 
     def __init__( self, label="Input:", title="User Input" ):
         """
-        Initializes a LineEditDialog with a label, its companiion line
+        Initializes a LineEditDialog with a label, its companion line
         edit, and a pair of buttons; one for accepting the dialog and
         one for dismissing it.
 
@@ -438,14 +438,7 @@ class PhotoRecordViewer( RecordWindow ):
         self.selectionBoxLabel = QLabel( "&Processing Type:" )
         self.selectionBoxLabel.setBuddy( self.selectionBox )
 
-        self.photoPreview = QLabel()
-        self.photoPreview.setBackgroundRole( QPalette.Base )
-        # XXX: why is a preferred size policy with a minimum size better than
-        #      ignored with minimum?  the latter causes the image to overflow into
-        #      the label area and hide it unless the window is resized.
-        self.photoPreview.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Preferred )
-        self.photoPreview.setScaledContents( True )
-        self.photoPreview.setMinimumSize( 400, 300 )
+        self.previewArea = grafwidgets.PhotoPreviewArea()
 
         # informational labels for the photo record.
         self.infoStateLabel    = QLabel()
@@ -523,9 +516,9 @@ class PhotoRecordViewer( RecordWindow ):
         stats_layout.addWidget( self.infoTagsLabel,
                                 4, 1 )
 
-        info_layout.addWidget( self.photoPreview )
+        info_layout.addWidget( self.previewArea )
         info_layout.addLayout( stats_layout )
-        info_layout.setStretchFactor( self.photoPreview, 1 )
+        info_layout.setStretchFactor( self.previewArea, 1 )
 
         self.centralWidget = QWidget()
         self.centralWidget.setLayout( info_layout )
@@ -580,6 +573,10 @@ class PhotoRecordViewer( RecordWindow ):
 
         Returns nothing.
         """
+
+        # ensure the selection view has focus so user can immediately page
+        # through images via arrow keys.
+        self.selectionView.setFocus()
 
         # select the first entry so we can use the keyboard for navigation.
         #
@@ -835,10 +832,10 @@ class PhotoRecordViewer( RecordWindow ):
 
                     record_count += 1
 
-                # keep track of the current pixmap and scale it for our
-                # preview.
+                # keep track of the current pixmap and assign it to our
+                # preview area.
                 self.preview_pixmap = pixmap
-                self.photoPreview.setPixmap( self.preview_pixmap.scaled( 600, 450, Qt.KeepAspectRatio ) )
+                self.previewArea.set_photo( self.preview_pixmap )
 
                 # update the labels.
                 self.infoStateLabel.setText( photo["state"] )
@@ -864,7 +861,7 @@ class PhotoRecordViewer( RecordWindow ):
                 break
         else:
             # could not find the photo, set some benign defaults.
-            self.photoPreview.clear()
+            self.previewArea.clear()
             self.infoStateLabel.clear()
             self.infoLocationLabel.clear()
             self.infoAddressLabel.clear()
@@ -902,7 +899,6 @@ class PhotoRecordEditor( RecordEditor ):
     STATE_COLUMN = 1
     NUM_COLUMNS  = 2
 
-    # XXX: review the calling convention.
     def __init__( self, db, photo_record, preview_pixmap ):
 
         self.db          = db
@@ -912,10 +908,12 @@ class PhotoRecordEditor( RecordEditor ):
         # only be edited by one window at a time.
         self.art_record_editors = dict()
 
-        super().__init__( photo_record, preview_pixmap, QSize(800, 600) )
+        super().__init__( photo_record, preview_pixmap, QSize( 800, 875 ) )
 
         self.setWindowTitle( "Photo Record Editor: {:s} [{:d}]".format( self.record["filename"],
                                                                         self.record["id"] ) )
+
+        self.resize( self.sizeHint() )
 
     def create_models( self ):
         """
@@ -962,9 +960,10 @@ class PhotoRecordEditor( RecordEditor ):
 
         Returns nothing.
         """
+
         #    photo preview.
-        self.photoPreview = grafwidgets.MultiRubberBandedPixmap( self.preview_pixmap,
-                                                                 resolution=(600, 450) )
+        self.photoPreview = grafwidgets.MultiRubberBandedLabel( self.preview_pixmap )
+        self.previewArea  = grafwidgets.PhotoPreviewArea( self.photoPreview )
 
         # draw the art record regions.
         # XXX: factor this into a separate routine
@@ -1091,6 +1090,7 @@ class PhotoRecordEditor( RecordEditor ):
 
         # XXX: the layout of these labels is *awful*.  need to fix this.
         art_header_label = QLabel( "<b>Art Record:</b>" )
+        art_header_label.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( art_header_label,
                                         0, 0, 1, 4 )
 
@@ -1143,6 +1143,7 @@ class PhotoRecordEditor( RecordEditor ):
                                         4, 3 )
 
         photo_header_label = QLabel( "<b>Photo Record:</b>" )
+        photo_header_label.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( photo_header_label,
                                         5, 0, 1, 4 )
 
@@ -1161,9 +1162,9 @@ class PhotoRecordEditor( RecordEditor ):
         horizontal_layout.addLayout( info_and_edit_layout )
         horizontal_layout.setStretchFactor( info_and_edit_layout, 1 )
 
-        main_layout.addWidget( self.photoPreview )
-        main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
+        main_layout.addWidget( self.previewArea )
         main_layout.addLayout( horizontal_layout )
+        main_layout.setStretchFactor( self.previewArea, 1 )
 
         self.centralWidget = QWidget()
         self.centralWidget.setLayout( main_layout )
@@ -1206,6 +1207,9 @@ class PhotoRecordEditor( RecordEditor ):
 
         Returns nothing.
         """
+        # ensure the selection view has focus so user can immediately page
+        # through images via arrow keys.
+        self.selectionView.setFocus()
 
         # select the first entry so we can use the keyboard for navigation.
         self.selectionView.setCurrentIndex( self.proxyArtModel.index( 0, self.ID_COLUMN ) )
@@ -1555,7 +1559,7 @@ class PhotoRecordEditor( RecordEditor ):
             return
 
         # make sure we emit our closed signal.
-        super().closeEvent(event)
+        super().closeEvent( event )
 
         # time to go away.
         event.accept()
@@ -1609,11 +1613,13 @@ class ArtRecordEditor( RecordEditor ):
         self.photo_record   = self.db.get_photo_records( photo_id )
         print( "Photo record [{}]: {}".format( self.photo_id, self.photo_record ) )
 
-        super().__init__( art_record, preview_pixmap, QSize(800, 600) )
+        super().__init__( art_record, preview_pixmap, QSize( 800, 800 ) )
 
         self.setWindowTitle( "Art Record Editor: {:s} [{:d}, {:d}]".format( self.photo_record["filename"],
                                                                             self.photo_id,
                                                                             self.record["id"] ) )
+
+        self.resize( self.sizeHint() )
 
     def create_models( self ):
         """
@@ -1637,38 +1643,28 @@ class ArtRecordEditor( RecordEditor ):
         """
 
         # create a preview of this record's photo.
-        self.photoPreview = grafwidgets.RubberBandedPixmap( self.preview_pixmap,
-                                                            (600, 450) )
-        self.photoPreview.setSizePolicy( QSizePolicy.Expanding, QSizePolicy.Expanding ) # reduces the space needed.
-
-        pixmap_size = self.photoPreview.pixmap().size()
+        self.photoPreview = grafwidgets.RubberBandedLabel( self.preview_pixmap )
+        self.previewArea  = grafwidgets.PhotoPreviewArea( self.photoPreview )
 
         # overlay the interactive rubberband box.
         if self.record["region"] is not None:
             # use an existing region.
-            normalized_geometry = self.record["region"]
+            self.photoPreview.set_normalized_band( self.record["region"] )
         else:
             # create a new region that spans the entirety of the photo.
             #
             # NOTE: we fake a normalized geometry that starts a single pixel
-            #       into the pixmap runs the entirety of both dimensions.
+            #       into the pixmap and runs the entirety of both dimensions.
             #
-            width_offset  = 1 / pixmap_size.width()
-            height_offset = 1 / pixmap_size.height()
+            label_size = self.previewArea.photo_label.size()
 
-            normalized_geometry = [width_offset,
-                                   height_offset,
-                                   1.0,
-                                   1.0]
+            width_offset  = 1 / label_size.width()
+            height_offset = 1 / label_size.height()
 
-        # map our normalized geometry to our pixmap's dimensions.
-        geometry = QRect( round( normalized_geometry[0] * pixmap_size.width() ),
-                          round( normalized_geometry[1] * pixmap_size.height() ),
-                          round( normalized_geometry[2] * pixmap_size.width() ),
-                          round( normalized_geometry[3] * pixmap_size.height() ) )
-
-        # XXX: abusing the interface
-        self.photoPreview.banded_region.setGeometry( geometry )
+            self.photoPreview.set_normalized_band( [width_offset,
+                                                    height_offset,
+                                                    1.0,
+                                                    1.0] )
 
         # create the combination boxes/line edits and their associated labels
         # that let the user edit this record.
@@ -1822,10 +1818,9 @@ class ArtRecordEditor( RecordEditor ):
         main_layout.setContentsMargins( 0, 0, 0, 0 )
         main_layout.setSpacing( 0 )
 
-        main_layout.addWidget( self.photoPreview )
-        main_layout.setAlignment( self.photoPreview, Qt.AlignCenter ) # the preview should be centered.
+        main_layout.addWidget( self.previewArea )
         main_layout.addLayout( editing_layout )
-        main_layout.setStretchFactor( self.photoPreview, 1 )
+        main_layout.setStretchFactor( self.previewArea, 1 )
 
         self.centralWidget = QGroupBox()
         self.centralWidget.setLayout( main_layout )
@@ -1844,7 +1839,7 @@ class ArtRecordEditor( RecordEditor ):
         # when there are more than two QMainWindow instances causes
         # a hard crash. Left in for now since shortcut works fine,
         # but a refactor is necessary to get Record/Art viewer to be
-        # QWidget decendents, rather than QMainWindow.
+        # QWidget descendants, rather than QMainWindow.
         self.closeAct  = QAction( "C&lose", self, shortcut="Ctrl+W",
                                    triggered=self.close )
 
