@@ -1417,6 +1417,40 @@ class Database( object ):
 
         return self.art_fields["artists"]
 
+    def new_artist( self, artist_name ):
+        """
+        Adds a new artist into the database.  If the artist name supplied is
+        already in the database, a ValueError exception is raised.  Insertion
+        is performed before the first artist name that would sort
+        lexiographically, ignoring case insensitivity, thus preserving the
+        existing artist name ordering.
+
+        Takes 1 argument:
+
+          artist_name - Artist name string to insert into the database.
+
+        Returns nothing.
+
+        """
+
+        if artist_name in self.art_fields["artists"]:
+            raise ValueError( "'{:s}' is already an artist in the database.".format( artist_name ) )
+
+        # find the first position where the new artist sorts (insensitively)
+        # after everything before it.
+        #
+        # NOTE: we don't use something like the bisect module so as to
+        #       preserve the existing order of the artists, which may or may
+        #       not be sorted.
+        #
+        for index, existing_artist_name in enumerate( self.art_fields["artists"] ):
+            if artist_name.lower() < existing_artist_name.lower():
+                break
+
+        self.art_fields["artists"].insert( index, artist_name )
+
+        self.mark_data_dirty()
+
     def get_art_types( self ):
         """
         Gets a list of the art types known by the database.
