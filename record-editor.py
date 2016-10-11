@@ -489,7 +489,8 @@ class PhotoRecordViewer( RecordWindow ):
 
         stats_layout = QGridLayout()
         stats_layout.setContentsMargins( 0, 0, 0, 0 )
-        stats_layout.setSpacing( 0 )
+        stats_layout.setVerticalSpacing( 1 )
+        stats_layout.setHorizontalSpacing( 10 )
 
         stats_layout.addWidget( QLabel( "State:" ),
                                 0, 0 )
@@ -515,6 +516,8 @@ class PhotoRecordViewer( RecordWindow ):
                                 4, 0 )
         stats_layout.addWidget( self.infoTagsLabel,
                                 4, 1 )
+
+        stats_layout.setColumnStretch( 1, 1 )
 
         info_layout.addWidget( self.previewArea )
         info_layout.addLayout( stats_layout )
@@ -1004,13 +1007,9 @@ class PhotoRecordEditor( RecordEditor ):
 
         #   art record summary labels.
         self.artTypeLabel       = QLabel()
-        self.artTypeLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         self.artSizeLabel       = QLabel()
-        self.artSizeLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         self.artQualityLabel    = QLabel()
-        self.artQualityLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         self.artDateLabel       = QLabel()
-        self.artDateLabel.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         self.artArtistsLabel    = QLabel()
         self.artAssociatesLabel = QLabel()
         self.artVandalsLabel    = QLabel()
@@ -1020,7 +1019,6 @@ class PhotoRecordEditor( RecordEditor ):
         self.photoProcessingStateComboBox = QComboBox()
         for state in self.db.get_processing_states():
             self.photoProcessingStateComboBox.addItem( state, state )
-        self.photoProcessingStateComboBox.setSizePolicy( QSizePolicy.Fixed, QSizePolicy.Fixed )
         self.photoProcessingStateComboLabel = QLabel( "Stat&e:" )
         self.photoProcessingStateComboLabel.setBuddy( self.photoProcessingStateComboBox )
 
@@ -1086,13 +1084,15 @@ class PhotoRecordEditor( RecordEditor ):
         #   selected art record information and photo record editing widgets.
         info_and_edit_layout = QGridLayout()
         info_and_edit_layout.setContentsMargins( 0, 0, 0, 0 )
-        info_and_edit_layout.setSpacing( 0 )
+        info_and_edit_layout.setVerticalSpacing( 0 )
+        info_and_edit_layout.setHorizontalSpacing( 2 )
 
         # XXX: the layout of these labels is *awful*.  need to fix this.
         art_header_label = QLabel( "<b>Art Record:</b>" )
-        art_header_label.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( art_header_label,
                                         0, 0, 1, 4 )
+
+        info_and_edit_layout.setRowStretch( 0, 1 )
 
         type_label = QLabel( "Type:" )
         info_and_edit_layout.addWidget( type_label,
@@ -1118,6 +1118,8 @@ class PhotoRecordEditor( RecordEditor ):
         info_and_edit_layout.addWidget( self.artDateLabel,
                                         4, 1 )
 
+        info_and_edit_layout.setColumnStretch( 1, 1 )
+
         artists_label = QLabel( "Artists:" )
         info_and_edit_layout.addWidget( artists_label,
                                         1, 2 )
@@ -1142,10 +1144,13 @@ class PhotoRecordEditor( RecordEditor ):
         info_and_edit_layout.addWidget( self.artTagsLabel,
                                         4, 3 )
 
+        info_and_edit_layout.setColumnStretch( 3, 1 )
+
         photo_header_label = QLabel( "<b>Photo Record:</b>" )
-        photo_header_label.setSizePolicy( QSizePolicy.Preferred, QSizePolicy.Fixed )
         info_and_edit_layout.addWidget( photo_header_label,
                                         5, 0, 1, 4 )
+
+        info_and_edit_layout.setRowStretch( 5, 1 )
 
         info_and_edit_layout.addWidget( self.photoProcessingStateComboLabel,
                                         6, 0 )
@@ -1875,6 +1880,9 @@ class ArtRecordEditor( RecordEditor ):
         self.artDateLineEdit.setText( "" if self.record["date"] is None else self.record["date"] )
         self.artProcessingStateComboBox.setCurrentIndex( self.artProcessingStateComboBox.findText( self.record["state"] ) )
         self.artTagsLineEdit.setText( "" if len( self.record["tags"] ) == 0 else ", ".join( self.record["tags"] ) )
+
+        # give the art type combo box focus so it can be set immediately on launch.
+        self.artTypeComboBox.setFocus()
 
         # ensure that we start with an empty selection view.
         self.artArtistsListView.selectionModel().clear()

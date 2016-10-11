@@ -166,6 +166,10 @@ class RubberBandedWidget( QWidget ):
         # run our parent class' constructor and pass our parent widget to it.
         super().__init__( parent )
 
+        # give ourselves a minimum size which still allows relatively easy
+        # access to the size grips.
+        self.setMinimumSize( QSize( 10, 10 ) )
+
         # ensure that our size grips only control the rubberband and not the
         # widget that we're operating on.
         self.setWindowFlags( Qt.SubWindow )
@@ -242,13 +246,35 @@ class RubberBandedWidget( QWidget ):
         """
 
         if self.tracking_position:
+            label_pos  = self.mapToParent( event.pos() )
+            label_rect = self.parent().rect()
+
             delta_pos = QPoint( event.screenPos().x() - self.tracking_position.x(),
                                 event.screenPos().y() - self.tracking_position.y() )
 
-            self.setGeometry( self.geometry().adjusted( delta_pos.x(),
-                                                        delta_pos.y(),
-                                                        delta_pos.x(),
-                                                        delta_pos.y() ) )
+            new_geometry = self.geometry().adjusted( delta_pos.x(),
+                                                     delta_pos.y(),
+                                                     delta_pos.x(),
+                                                     delta_pos.y() )
+
+            # ensure the new geometry stays within the bounds of the current
+            # image label while still allowing adjustment of the opposite axis
+            # when the cursor is outside the bounds of the outer label.
+            if( new_geometry.x() + new_geometry.width() > label_rect.width() or
+                label_pos.x() > label_rect.width() ):
+                new_geometry.moveTo( label_rect.width() - new_geometry.width(),
+                                     new_geometry.y() )
+            elif new_geometry.x() < 0 or label_pos.x() < 0:
+                new_geometry.moveTo( 0, new_geometry.y() )
+
+            if( new_geometry.y() + new_geometry.height() > label_rect.height() or
+                label_pos.y() > label_rect.height() ):
+                new_geometry.moveTo( new_geometry.x(),
+                                     label_rect.height() - new_geometry.height() )
+            elif new_geometry.y() < 0 or label_pos.y() < 0:
+                new_geometry.moveTo( new_geometry.x(), 0 )
+
+            self.setGeometry( new_geometry )
 
             self.tracking_position = event.screenPos()
 
@@ -441,9 +467,21 @@ class RubberBandedLabel( QLabel ):
         # starting size.
         self.banded_region.resize( self.banded_region.sizeHint() )
 
-        new_position = self.banded_region.geometry()
-        new_position.moveCenter( QPoint( event.x(), event.y() ) )
-        self.banded_region.setGeometry( new_position )
+        self.banded_region.move( event.x(), event.y() )
+        new_geometry = self.banded_region.geometry()
+
+        # ensure the new geometry fits within the bounds of the current
+        # image label. since we position the upper left corner of banded region
+        # to the cursor position, we only need to check the "positive"
+        # extremities since its impossible to receive a double-click event
+        # outside the bounds of this label.
+        if new_geometry.x() + new_geometry.width() > self.rect().width():
+            self.banded_region.move( self.rect().width() - new_geometry.width(),
+                                     self.banded_region.geometry().y() )
+
+        if new_geometry.y() + new_geometry.height() > self.rect().height():
+            self.banded_region.move( self.banded_region.geometry().x(),
+                                     self.rect().height() - new_geometry.height() )
 
         # need to update this here since a calling resize() won't trigger a
         # resizeEvent if the band is already at its recommended size.
