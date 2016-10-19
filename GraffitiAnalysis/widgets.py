@@ -117,6 +117,337 @@ class PhotoPreviewArea( QScrollArea ):
         super().resizeEvent( event )
         self.rescale()
 
+class ArtistSelector( QWidget ):
+    """
+    Widget used to select a subset of the available artists within the
+    database. Consists of a QComboBox used to provide a drop-down for
+    all artists and a line edit with completer for entering specific
+    artists, as well as a list widget for displaying the currently subset of
+    selected artists. New artists can be entered as well, and are denoted via
+    blue text within the selection list.
+
+    The selected artists can be obtained via the selected_artists property,
+    and any new artists entered are returned via the new_artists property.
+
+    """
+
+    # role used to denote whether a selected artist is new (within the
+    # database).
+    NEW_ARTIST_ROLE = Qt.UserRole + 1
+
+    def __init__( self, artist_model, parent=None ):
+        """
+        Constructs a new ArtistSelector from an existing artist model.
+
+        Takes 2 arguments:
+
+          artist_model - Subclass of QAbstractItemModel containing the artists
+                         to select from.
+          parent       - QWidget parent of this ArtistSelector.
+
+        Returns 1 value:
+
+          self - The newly created ArtistSelector object.
+
+        """
+
+        super().__init__( parent )
+
+        self.artists_box = QComboBox()
+        self.artists_box.setModel( artist_model )
+        self.artists_box.setEditable( True )
+
+        # we only want this combobox to update on commits to database.
+        self.artists_box.setInsertPolicy( QComboBox.NoInsert )
+
+        # have the combobox's line edit popup with potential completions.
+        self.artists_box.completer().setCompletionMode( QCompleter.PopupCompletion )
+
+        self.selection_list = QListWidget()
+        self.selection_list.setSortingEnabled( True )
+        self.selection_list.setAlternatingRowColors( True )
+
+        # enable a focus policy to be propagated to our focus proxy, the line
+        # edit of the artist combobox. this allows the shortcuts from the buddy
+        # labels to highlight the combobox contents as expected.
+        self.setFocusPolicy( Qt.TabFocus )
+        self.setFocusProxy( self.artists_box.lineEdit() )
+
+        # have the customContextMenuRequested signal emit when the selection
+        # list is right-clicked.
+        self.selection_list.setContextMenuPolicy( Qt.CustomContextMenu )
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins( 0, 0, 0, 0 )
+        layout.addWidget( self.artists_box )
+        layout.addWidget( self.selection_list )
+
+        self.setLayout( layout )
+
+        # install ArtistSelector as the event filter for its selection list so
+        # we can grab key presses.
+        self.selection_list.installEventFilter( self )
+
+        # create the right-click context menu.
+        self.context_menu = QMenu()
+
+        self.remove_artist_action = QAction( "&Remove artist" )
+        self.remove_artist_action.triggered.connect( self.remove_selected_artist )
+
+        self.clear_all_action = QAction( "&Clear all" )
+        self.clear_all_action.triggered.connect( self.selection_list.clear )
+
+        self.context_menu.addAction( self.remove_artist_action )
+        self.context_menu.addAction( self.clear_all_action )
+
+        # wire everything up.
+        self.selection_list.customContextMenuRequested.connect( self.context_menu_requested )
+
+        # note that care is taken here to avoid using the 'activated' and
+        # 'currentIndexChanged' signals of QComboBox for list insertion, since
+        # navigating the drop-down list with the arrow keys also causes them to
+        # be emitted. instead we trigger only off mouse clicks on the drop-down
+        # views themselves, as well as return presses within the combobox's
+        # QLineEdit.
+        self.artists_box.view().pressed.connect( self.artist_selected )
+        self.artists_box.lineEdit().returnPressed.connect( self.return_pressed )
+        self.artists_box.completer().popup().pressed.connect( self.artist_selected_from_autocomplete )
+
+    @property
+    def new_artists( self ):
+        """
+        Property to acquire only the new artists entered by the user.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          list( str ) - List of all new artist names currently within the
+                        selection list.
+
+        """
+
+        return [self.selection_list.item( i ).text()
+                for i in range( self.selection_list.count() )
+                if self.selection_list.item( i ).data( ArtistSelector.NEW_ARTIST_ROLE )]
+
+    @property
+    def selected_artists( self ):
+        """
+        Property to acquire all artists selected or entered by the user.
+
+        Takes no arguments.
+
+        Returns 1 value:
+
+          list( str ) - List of all artist names currently within the
+                        selection list.
+
+        """
+
+        return [self.selection_list.item( i ).text()
+                for i in range( self.selection_list.count() )]
+
+    @selected_artists.setter
+    def selected_artists( self, artists ):
+        """
+        Setter used to pre-populate the selection list. Should only be used at
+        initialization time.
+
+        Takes 1 argument:
+
+          artists - List of strings containing the artists to pre-populate the
+                    selection list with.
+
+        Returns nothing.
+        """
+
+        # head off any duplicates provided by casting to a set first.
+        self.selection_list.addItems( set( artists ) )
+
+    def artist_exists( self, artist ):
+        """
+        Helper method to query whether the given artist exists within the
+        provided model.
+
+        Takes 1 argument:
+
+          artist - Name of the artist to search for.
+
+        Returns 1 value:
+
+          bool - True if artist exists within our model, False otherwise.
+
+        """
+
+        # perform case-insensitive search for first whole string match.
+        if self.artists_box.model().match( self.artists_box.model().index( 0, 0 ),
+                                           Qt.EditRole,
+                                           artist,
+                                           1,
+                                           Qt.MatchFixedString | Qt.MatchWrap ):
+            return True
+        else:
+            return False
+
+    @pyqtSlot( QModelIndex )
+    def artist_selected( self, artist_index ):
+        """
+        Slot invoked when the user selects an artist via the full drop-down
+        menu of the combobox.
+
+        Takes 1 argument:
+
+          artist_index - QModelIndex corresponding to the artist selected from
+                         the drop-down.
+
+        Returns nothing.
+        """
+
+        # translate the model index into the artist name.
+        artist = self.artists_box.itemText( artist_index.row() )
+
+        if artist not in self.selected_artists:
+            # since we know this artist name came from the full drop-down
+            # list, we can assume its already in the model.
+            artist_item = QListWidgetItem( artist )
+            artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
+            self.selection_list.addItem( artist_item )
+
+    @pyqtSlot( QModelIndex )
+    def artist_selected_from_autocomplete( self, artist_index ):
+        """
+        Slot invoked when the user selects an artist via the popup with
+        auto-complete suggestions. This requires a distinct slot since
+        QCompleter populates its own model for potential completions.
+
+        Takes 1 argument:
+
+          artist_index - QModelIndex corresponding to the artist selected from
+                         the auto-complete popup. Must be used with the
+                         completer's model.
+
+        Returns nothing.
+        """
+
+        completion_model = self.artists_box.completer().completionModel()
+        artist = completion_model.data( artist_index )
+
+        if artist not in self.selected_artists:
+            # once again, since this was a suggested completion we can assume
+            # its not a new artist.
+            artist_item = QListWidgetItem( artist )
+            artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
+            self.selection_list.addItem( artist_item )
+
+    @pyqtSlot( int )
+    def commit_new_artists( self, record_id ):
+        """
+        Slot invoked when an art record has been committed, and with it any
+        previously new artists entered by the user within this ArtistSelector.
+
+        Takes 1 argument:
+
+          record_id - Unused record identifier provided by committed signal
+                      of ArtRecordEditor.
+
+        Returns nothing.
+        """
+
+        # all that is new is old once again, reset status of all entries.
+        for i in range( self.selection_list.count() ):
+            current_item = self.selection_list.item( i )
+            current_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
+            current_item.setForeground( Qt.black )
+
+    @pyqtSlot( QPoint )
+    def context_menu_requested( self, pos ):
+        """
+        Slot invoked when the user right-clicks on the selection list. The
+        context menu is provided at the click position.
+
+        Takes 1 argument:
+
+          pos - QPoint position of the right-click in widget coordinates.
+
+        Returns nothing.
+        """
+
+        self.context_menu.exec( self.selection_list.mapToGlobal( pos ) )
+
+    def eventFilter( self, obj, event ):
+        """
+        Event filter used to capture key press events on the selection list.
+        We only listen for the delete key as a shortcut for removing the
+        currently selected artist from the selection list.
+
+        Takes 2 arguments:
+
+          obj   - Handle to the object the event was intended for. In our case
+                  this will always be the selection list.
+          event - QEvent containing details of the event.
+
+        Returns 1 value:
+
+          bool - False if the event should be propagated to obj, True
+                 otherwise.
+
+        """
+
+        if obj == self.selection_list:
+            if ( event.type() == QEvent.KeyPress ):
+                if( event.key()  == Qt.Key_Delete ):
+                    self.remove_selected_artist()
+                #return True
+
+        return False
+
+    @pyqtSlot()
+    def return_pressed( self ):
+        """
+        Slot invoked whenever the return key is pressed on the line edit
+        portion of the QComboBox. The current text of line edit is added as
+        an artist to the selection list.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        artist = self.artists_box.lineEdit().text()
+
+        if artist not in self.selected_artists:
+            artist_item = QListWidgetItem()
+
+            # need to determine if a new artist name was entered, or the user
+            # entered the full name of an existing artist. note that the
+            # artist search is case-insensitive, but we utilize the completer
+            # to auto-convert to the 'canonical' name stored within the model.
+            if self.artist_exists( artist ):
+                self.artists_box.completer().setCompletionPrefix( artist )
+                artist_item.setData( Qt.DisplayRole, self.artists_box.completer().currentCompletion() )
+                artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
+            else:
+                artist_item.setData( Qt.DisplayRole, artist )
+                artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, True )
+                artist_item.setForeground( Qt.red )
+
+            self.selection_list.addItem( artist_item )
+
+    @pyqtSlot()
+    def remove_selected_artist( self ):
+        """
+        Slot invoked whenever the currently selected artist within the
+        selection list should be removed.
+
+        Takes no arguments.
+
+        Returns nothing.
+        """
+
+        if self.selection_list.count() > 0:
+            self.selection_list.takeItem( self.selection_list.currentRow() )
+
 class RubberBandedWidget( QWidget ):
     """
     Adds an interactive rubberband box to a widget.
@@ -538,7 +869,7 @@ class RubberBandedLabel( QLabel ):
                           round( self.normalized_band.height() * event.size().height() ) )
 
         self.banded_region.setGeometry( geometry )
-        self.normalized_geometry = self.get_region_geometry( True )
+        self.normalized_band = self.get_region_geometry( True )
 
     @pyqtSlot()
     def band_geometry_changed( self ):

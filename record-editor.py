@@ -1710,31 +1710,25 @@ class ArtRecordEditor( RecordEditor ):
         # create the multi-selection views for the artists.
 
         #  artists
-        self.artArtistsListView = QListView()
-        self.artArtistsListView.setModel( self.artistsModel )
-        self.artArtistsListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        self.artArtistsListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.artArtistsSelector = grafwidgets.ArtistSelector( self.artistsModel )
+        self.committed.connect( self.artArtistsSelector.commit_new_artists )
 
-        self.artArtistsListLabel = QLabel( "&Artists:" )
-        self.artArtistsListLabel.setBuddy( self.artArtistsListView )
+        self.artArtistsLabel = QLabel( "&Artists:" )
+        self.artArtistsLabel.setBuddy( self.artArtistsSelector )
 
         #  associates
-        self.artAssociatesListView = QListView()
-        self.artAssociatesListView.setModel( self.artistsModel )
-        self.artAssociatesListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        self.artAssociatesListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.artAssociatesSelector = grafwidgets.ArtistSelector( self.artistsModel )
+        self.committed.connect( self.artAssociatesSelector.commit_new_artists )
 
-        self.artAssociatesListLabel = QLabel( "Ass&ociates:" )
-        self.artAssociatesListLabel.setBuddy( self.artAssociatesListView )
+        self.artAssociatesLabel = QLabel("Ass&ociates:")
+        self.artAssociatesLabel.setBuddy( self.artAssociatesSelector )
 
         #  vandals
-        self.artVandalsListView = QListView()
-        self.artVandalsListView.setModel( self.artistsModel )
-        self.artVandalsListView.setSelectionMode( QAbstractItemView.ExtendedSelection )
-        self.artVandalsListView.setEditTriggers( QAbstractItemView.NoEditTriggers )
+        self.artVandalsSelector = grafwidgets.ArtistSelector( self.artistsModel )
+        self.committed.connect( self.artVandalsSelector.commit_new_artists )
 
-        self.artVandalsListLabel = QLabel( "&Vandals:" )
-        self.artVandalsListLabel.setBuddy( self.artVandalsListView )
+        self.artVandalsLabel = QLabel( "&Vandals:" )
+        self.artVandalsLabel.setBuddy( self.artVandalsSelector )
 
         #  line editor for tags.
         self.artTagsLineEdit = QLineEdit( "" )
@@ -1785,25 +1779,25 @@ class ArtRecordEditor( RecordEditor ):
                                   4, 1 )
 
         # 5th
-        editing_layout.addWidget( self.artArtistsListLabel,
+        editing_layout.addWidget( self.artArtistsLabel,
                                   0, 3 )
-        editing_layout.addWidget( self.artArtistsListView,
+        editing_layout.addWidget( self.artArtistsSelector,
                                   1, 3,
-                                  4, 1 )
+                                  5, 1 )
 
         # 6th
-        editing_layout.addWidget( self.artAssociatesListLabel,
+        editing_layout.addWidget( self.artAssociatesLabel,
                                   0, 5 )
-        editing_layout.addWidget( self.artAssociatesListView,
+        editing_layout.addWidget( self.artAssociatesSelector,
                                   1, 5,
-                                  4, 1 )
+                                  5, 1 )
 
         # 7th
-        editing_layout.addWidget( self.artVandalsListLabel,
+        editing_layout.addWidget( self.artVandalsLabel,
                                   0, 7 )
-        editing_layout.addWidget( self.artVandalsListView,
+        editing_layout.addWidget( self.artVandalsSelector,
                                   1, 7,
-                                  4, 1 )
+                                  5, 1 )
 
         # 8th
         editing_layout.addWidget( self.artTagsLabel,
@@ -1856,7 +1850,7 @@ class ArtRecordEditor( RecordEditor ):
         self.windowMenu.addAction( self.closeAct )
 
         self.newArtistAct = QAction( "New &Artist", self, shortcut="Ctrl+A",
-                                     triggered=self.new_artist )
+                                     triggered=self.new_artist_dialog )
         self.databaseMenu = QMenu( "&Database", self )
         self.databaseMenu.addAction( self.newArtistAct )
 
@@ -1884,27 +1878,9 @@ class ArtRecordEditor( RecordEditor ):
         # give the art type combo box focus so it can be set immediately on launch.
         self.artTypeComboBox.setFocus()
 
-        # ensure that we start with an empty selection view.
-        self.artArtistsListView.selectionModel().clear()
-        self.artAssociatesListView.selectionModel().clear()
-        self.artVandalsListView.selectionModel().clear()
-
-        # walk through the model backing each of our artist selections and
-        # select each one that is associated with the art.
-        #
-        # NOTE: each of the views uses the same model so we can iterate across
-        #       any one's contents.
-        #
-        for artist_index, artist in enumerate( self.artArtistsListView.model().stringList() ):
-            if artist in self.record["artists"]:
-                self.artArtistsListView.selectionModel().select( self.artArtistsListView.model().index( artist_index ),
-                                                                 QItemSelectionModel.Select )
-            if artist in self.record["associates"]:
-                self.artAssociatesListView.selectionModel().select( self.artAssociatesListView.model().index( artist_index ),
-                                                                    QItemSelectionModel.Select )
-            if artist in self.record["vandals"]:
-                self.artVandalsListView.selectionModel().select( self.artVandalsListView.model().index( artist_index ),
-                                                                 QItemSelectionModel.Select )
+        self.artArtistsSelector.selected_artists    = self.record["artists"]
+        self.artAssociatesSelector.selected_artists = self.record["associates"]
+        self.artVandalsSelector.selected_artists    = self.record["vandals"]
 
     def commit_record( self ):
         """
@@ -1928,9 +1904,16 @@ class ArtRecordEditor( RecordEditor ):
         self.record["tags"]          = list( map( lambda x: x.strip(),
                                                   self.artTagsLineEdit.text().split( ", " ) ) )
 
-        self.record["artists"]       = [artist.data() for artist in self.artArtistsListView.selectedIndexes()]
-        self.record["associates"]    = [associate.data() for associate in self.artAssociatesListView.selectedIndexes()]
-        self.record["vandals"]       = [vandal.data() for vandal in self.artVandalsListView.selectedIndexes()]
+        self.record["artists"]    = self.artArtistsSelector.selected_artists
+        self.record["associates"] = self.artAssociatesSelector.selected_artists
+        self.record["vandals"]    = self.artVandalsSelector.selected_artists
+
+        new_artists = set().union( self.artArtistsSelector.new_artists,
+                                   self.artAssociatesSelector.new_artists,
+                                   self.artVandalsSelector.new_artists )
+
+        for new_artist in new_artists:
+            self.add_new_artist( new_artist )
 
         # update the region.
         normalized_geometry = self.photoPreview.get_region_geometry( True )
@@ -1941,11 +1924,10 @@ class ArtRecordEditor( RecordEditor ):
 
         super().commit_record()
 
-    def new_artist( self ):
+    def new_artist_dialog( self ):
         """
         Prompts the user for a new artist name and inserts it into the
-        database.  If the new artist does not already exist in the database
-        it is inserted into the artists model.
+        database.
 
         Takes no arguments.
 
@@ -1967,6 +1949,20 @@ class ArtRecordEditor( RecordEditor ):
         if len( new_artist ) == 0:
             print( "No artist was supplied.  Ignoring." )
             return
+
+        self.add_new_artist( new_artist )
+
+    def add_new_artist( self, new_artist ):
+        """
+        Adds a new artist name into the database. If the new artist does not
+        already exist in the database it is inserted into the artists model.
+
+        Takes 1 argument:
+
+          new_artist - Name of the artist to add.
+
+        Returns nothing.
+        """
 
         # see if this artist already exists in the database.
         try:
