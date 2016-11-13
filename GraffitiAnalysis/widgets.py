@@ -135,6 +135,9 @@ class ArtistSelector( QWidget ):
     # database).
     NEW_ARTIST_ROLE = Qt.UserRole + 1
 
+    # placeholder artist stored by backend database.
+    DEFAULT_ARTIST = "Unknown"
+
     def __init__( self, artist_model, parent=None ):
         """
         Constructs a new ArtistSelector from an existing artist model.
@@ -160,11 +163,11 @@ class ArtistSelector( QWidget ):
         # we only want this combobox to update on commits to database.
         self.artists_box.setInsertPolicy( QComboBox.NoInsert )
 
-        # have the combobox's line edit popup with potential completions.
-        self.artists_box.completer().setCompletionMode( QCompleter.PopupCompletion )
+        # let the completer know our model is case-sensitively sorted so it
+        # can do binary search behind the scenes.
+        self.artists_box.completer().setModelSorting( QCompleter.CaseSensitivelySortedModel )
 
         self.selection_list = QListWidget()
-        self.selection_list.setSortingEnabled( True )
         self.selection_list.setAlternatingRowColors( True )
 
         # enable a focus policy to be propagated to our focus proxy, the line
@@ -211,7 +214,6 @@ class ArtistSelector( QWidget ):
         # QLineEdit.
         self.artists_box.view().pressed.connect( self.artist_selected )
         self.artists_box.lineEdit().returnPressed.connect( self.return_pressed )
-        self.artists_box.completer().popup().pressed.connect( self.artist_selected_from_autocomplete )
 
     @property
     def new_artists( self ):
@@ -244,9 +246,13 @@ class ArtistSelector( QWidget ):
                         selection list.
 
         """
+        artists = [self.selection_list.item( i ).text()
+                   for i in range( self.selection_list.count() )]
 
-        return [self.selection_list.item( i ).text()
-                for i in range( self.selection_list.count() )]
+        if not artists:
+            artists = [self.DEFAULT_ARTIST]
+
+        return artists
 
     @selected_artists.setter
     def selected_artists( self, artists ):
@@ -263,7 +269,31 @@ class ArtistSelector( QWidget ):
         """
 
         # head off any duplicates provided by casting to a set first.
-        self.selection_list.addItems( set( artists ) )
+        artists = set( artists )
+
+        # filter out the default "Unknown" artist
+        artists.discard( self.DEFAULT_ARTIST )
+
+        self.selection_list.addItems( artists )
+
+    def __contains__( self, artist ):
+        """
+        Lookup method for determining if an entered artist is already within
+        selection list. The lookup performed is case-insensitive.
+
+        Takes 1 argument:
+
+          artist - Name of the artist to look up.
+
+        Returns 1 value:
+
+          True if the artist name is stored within the selection list, False
+          otherwise.
+
+        """
+        artists = map( str.lower, self.selected_artists )
+
+        return str.lower( str( artist ) ) in artists
 
     def artist_exists( self, artist ):
         """
@@ -307,35 +337,9 @@ class ArtistSelector( QWidget ):
         # translate the model index into the artist name.
         artist = self.artists_box.itemText( artist_index.row() )
 
-        if artist not in self.selected_artists:
+        if artist not in self:
             # since we know this artist name came from the full drop-down
             # list, we can assume its already in the model.
-            artist_item = QListWidgetItem( artist )
-            artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
-            self.selection_list.addItem( artist_item )
-
-    @pyqtSlot( QModelIndex )
-    def artist_selected_from_autocomplete( self, artist_index ):
-        """
-        Slot invoked when the user selects an artist via the popup with
-        auto-complete suggestions. This requires a distinct slot since
-        QCompleter populates its own model for potential completions.
-
-        Takes 1 argument:
-
-          artist_index - QModelIndex corresponding to the artist selected from
-                         the auto-complete popup. Must be used with the
-                         completer's model.
-
-        Returns nothing.
-        """
-
-        completion_model = self.artists_box.completer().completionModel()
-        artist = completion_model.data( artist_index )
-
-        if artist not in self.selected_artists:
-            # once again, since this was a suggested completion we can assume
-            # its not a new artist.
             artist_item = QListWidgetItem( artist )
             artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
             self.selection_list.addItem( artist_item )
@@ -395,10 +399,10 @@ class ArtistSelector( QWidget ):
         """
 
         if obj == self.selection_list:
-            if ( event.type() == QEvent.KeyPress ):
-                if( event.key()  == Qt.Key_Delete ):
+            if event.type() == QEvent.KeyPress:
+                if event.key()  == Qt.Key_Delete:
                     self.remove_selected_artist()
-                #return True
+                    return True
 
         return False
 
@@ -415,24 +419,39 @@ class ArtistSelector( QWidget ):
         """
 
         artist = self.artists_box.lineEdit().text()
+        artist_item = QListWidgetItem()
 
-        if artist not in self.selected_artists:
-            artist_item = QListWidgetItem()
+        # need to determine if a new artist name was entered, or the user
+        # entered the full name of an existing artist. note that the
+        # artist search is case-insensitive, but we utilize the completer
+        # to auto-convert to the 'canonical' name stored within the model.
+        if self.artist_exists( artist ):
+            self.artists_box.completer().setCompletionPrefix( artist )
+            artist = self.artists_box.completer().currentCompletion()
 
-            # need to determine if a new artist name was entered, or the user
-            # entered the full name of an existing artist. note that the
-            # artist search is case-insensitive, but we utilize the completer
-            # to auto-convert to the 'canonical' name stored within the model.
-            if self.artist_exists( artist ):
-                self.artists_box.completer().setCompletionPrefix( artist )
-                artist_item.setData( Qt.DisplayRole, self.artists_box.completer().currentCompletion() )
-                artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
-            else:
-                artist_item.setData( Qt.DisplayRole, artist )
-                artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, True )
-                artist_item.setForeground( Qt.red )
+            artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, False )
+        else:
+            artist_item.setData( ArtistSelector.NEW_ARTIST_ROLE, True )
+            artist_item.setForeground( Qt.red )
 
+        artist_item.setData( Qt.DisplayRole, artist )
+
+        # finally, need to see if this artist has already been entered into
+        # the current selection list. this is also a case-insensitive lookup.
+        if artist not in self:
             self.selection_list.addItem( artist_item )
+        # if the artist exists, but hasn't been committed yet, update the
+        # displayed name.
+        else:
+            existing_items = self.selection_list.findItems( artist,
+                                                            Qt.MatchFixedString )
+
+            # the only way the search could fail is if the designated 'default'
+            # artist (Unknown) was entered.
+            if existing_items and existing_items[0].data( ArtistSelector.NEW_ARTIST_ROLE ):
+                existing_items[0].setData( Qt.DisplayRole, artist )
+
+        self.artists_box.lineEdit().selectAll()
 
     @pyqtSlot()
     def remove_selected_artist( self ):
